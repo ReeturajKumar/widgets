@@ -57,7 +57,6 @@ import { ScrewPumpUnit } from "./ScrewPumpUnit";
 import { SeallessCannedPump } from "./SeallessCannedPump";
 import { SewagePump } from "./SewagePump";
 import { ShellTubeHeatExchanger } from "./ShellTubeHeatExchanger";
-import { SolenoidValve } from "./SolenoidValve";
 import { SpacerCoupledPump } from "./SpacerCoupledPump";
 import { SphericalChamber } from "./SphericalChamber";
 import { SphericalPumpCasing } from "./SphericalPumpCasing";
@@ -102,7 +101,6 @@ const ART: Record<string, ComponentType<WidgetIconProps>> = {
   "pressure-valve": PressureValve,
   "submersible-pump": SubmersiblePump,
   "split-case-pump": SplitCasePump,
-  "solenoid-valve": SolenoidValve,
   "pumpjack": Pumpjack,
   "motor-driven-pump": MotorDrivenPump,
   "linear-actuator": LinearActuator,
