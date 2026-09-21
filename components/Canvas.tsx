@@ -154,7 +154,15 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
         setNodes((nds) =>
           nds.map((n) =>
             n.id === rid
-              ? { ...n, data: { ...n.data, name: icon.name, svg: icon.svg } }
+              ? {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    name: icon.name,
+                    svg: icon.svg,
+                    componentKey: icon.componentKey,
+                  },
+                }
               : n
           )
         );
@@ -181,7 +189,11 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
         position,
         width: NODE_SIZE,
         height: NODE_SIZE,
-        data: { name: icon.name, svg: icon.svg },
+        data: {
+          name: icon.name,
+          svg: icon.svg,
+          componentKey: icon.componentKey,
+        },
       };
       setNodes((nds) => nds.concat(newNode));
     },
@@ -238,7 +250,11 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
         position,
         width: NODE_SIZE,
         height: NODE_SIZE,
-        data: { name: icon.name, svg: icon.svg },
+        data: {
+          name: icon.name,
+          svg: icon.svg,
+          componentKey: icon.componentKey,
+        },
       };
 
       setNodes((nds) => nds.concat(newNode));

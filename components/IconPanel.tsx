@@ -3,7 +3,7 @@
 import { useRef, useState, type DragEvent } from "react";
 import type { IconDef } from "../lib/types";
 import { sanitizeSvg } from "../lib/sanitizeSvg";
-import { InlineSvg } from "./InlineSvg";
+import { IconArt } from "./IconArt";
 
 interface IconPanelProps {
   icons: IconDef[];
@@ -156,7 +156,8 @@ export function IconPanel({
                     ×
                   </button>
                 )}
-                <InlineSvg
+                <IconArt
+                  componentKey={icon.componentKey}
                   svg={icon.svg}
                   className="flex h-14 w-full items-center justify-center [&_svg]:h-full [&_svg]:w-full [&_img]:h-full [&_img]:w-full [&_img]:object-contain"
                 />
@@ -186,7 +187,8 @@ export function IconPanel({
               title={icon.name}
               className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-zinc-200"
             >
-              <InlineSvg
+              <IconArt
+                componentKey={icon.componentKey}
                 svg={icon.svg}
                 className="h-8 w-8 [&_svg]:h-full [&_svg]:w-full [&_img]:h-full [&_img]:w-full [&_img]:object-contain"
               />

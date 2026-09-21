@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import { useNodeActions } from "./NodeActionsContext";
-import { InlineSvg } from "./InlineSvg";
+import { IconArt } from "./IconArt";
 
 export interface IconNodeData extends Record<string, unknown> {
   name: string;
-  svg: string;
+  /** Raw markup, for uploaded icons and widgets not yet traced. */
+  svg?: string;
+  /** Registry key for a built widget component. */
+  componentKey?: string;
   rotation?: number;
 }
 
@@ -17,7 +20,7 @@ const handleClass =
   "!h-2.5 !w-2.5 !border-2 !border-white !bg-zinc-400";
 
 export function IconNode({ id, data, selected }: NodeProps) {
-  const { name, svg, rotation = 0 } = data as IconNodeData;
+  const { name, svg, componentKey, rotation = 0 } = data as IconNodeData;
   const { deleteNode, startReplace, rotateNode, replacingNodeId } =
     useNodeActions();
   const [hovered, setHovered] = useState(false);
@@ -72,6 +75,7 @@ export function IconNode({ id, data, selected }: NodeProps) {
             </svg>
           </button>
 
+
           {/* Replace button */}
           <button
             type="button"
@@ -106,6 +110,7 @@ export function IconNode({ id, data, selected }: NodeProps) {
         </div>
       )}
 
+
       {/* Replace mode hint badge */}
       {isReplacing && (
         <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-medium text-white shadow">
@@ -117,7 +122,8 @@ export function IconNode({ id, data, selected }: NodeProps) {
         className="flex min-h-0 w-full flex-1 items-center justify-center rounded-md transition-transform duration-150"
         style={{ transform: `rotate(${rotation}deg)` }}
       >
-        <InlineSvg
+        <IconArt
+          componentKey={componentKey}
           svg={svg}
           className="h-full w-full [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_img]:h-full [&_img]:w-full [&_img]:object-contain"
         />
