@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Python bytecode from tools/
 __pycache__/
+
+# Build-time widget tooling — kept locally, not shipped in the repo
+/tools/

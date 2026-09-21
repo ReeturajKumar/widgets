@@ -17,7 +17,6 @@ export function loadBuiltinIcons(): IconDef[] {
   const traced: IconDef[] = CONVERTED_WIDGETS.map((widget) => ({
     id: `builtin-${widget.key}`,
     name: widget.label,
-    source: "builtin" as const,
     componentKey: widget.key,
   }));
 
@@ -29,7 +28,6 @@ export function loadBuiltinIcons(): IconDef[] {
       return {
         id: `builtin-${name}`,
         name,
-        source: "builtin" as const,
         svg: markupFor(file, name),
       };
     });

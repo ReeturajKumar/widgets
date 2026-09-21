@@ -8,7 +8,7 @@ import { DEFAULT_THEME_ID, WIDGET_THEMES } from "../lib/widgetThemes";
 
 export interface IconNodeData extends Record<string, unknown> {
   name: string;
-  /** Raw markup, for uploaded icons and widgets not yet traced. */
+  /** Raw markup, for library files not built into a component. */
   svg?: string;
   /** Registry key for a built widget component. */
   componentKey?: string;

@@ -4,20 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IconPanel, SIDEBAR_WIDTH_CLOSED, SIDEBAR_WIDTH_OPEN } from "./IconPanel";
 import { Canvas } from "./Canvas";
-import { loadUploadedIcons, saveUploadedIcons } from "../lib/storage";
 import type { IconDef } from "../lib/types";
 
 const SIDEBAR_OPEN_KEY = "widgets.sidebarOpen.v1";
 
 export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
-  // Uploaded icons are persisted; builtins always come from code so new
-  // icons appear on update without clearing localStorage.
-  const [uploaded, setUploaded] = useState<IconDef[]>(() =>
-    loadUploadedIcons().filter((i) => i.source === "uploaded")
-  );
-
-  const icons: IconDef[] = [...builtinIcons, ...uploaded];
-
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
     try {
       return localStorage.getItem(SIDEBAR_OPEN_KEY) !== "false";
@@ -28,16 +19,9 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
 
   const addIconRef = useRef<((icon: IconDef) => void) | null>(null);
 
-  const handleRegisterAdd = useCallback(
-    (fn: (icon: IconDef) => void) => {
-      addIconRef.current = fn;
-    },
-    []
-  );
-
-  useEffect(() => {
-    saveUploadedIcons(uploaded);
-  }, [uploaded]);
+  const handleRegisterAdd = useCallback((fn: (icon: IconDef) => void) => {
+    addIconRef.current = fn;
+  }, []);
 
   useEffect(() => {
     try {
@@ -46,16 +30,6 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
       // ignore
     }
   }, [sidebarOpen]);
-
-  function handleAddIcon(icon: IconDef) {
-    if (icon.source === "uploaded") {
-      setUploaded((prev) => [...prev, icon]);
-    }
-  }
-
-  function handleRemoveIcon(id: string) {
-    setUploaded((prev) => prev.filter((icon) => icon.id !== id));
-  }
 
   function handleClickIcon(icon: IconDef) {
     addIconRef.current?.(icon);
@@ -66,11 +40,9 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       <IconPanel
-        icons={icons}
+        icons={builtinIcons}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen((v) => !v)}
-        onAddIcon={handleAddIcon}
-        onRemoveIcon={handleRemoveIcon}
         onClickIcon={handleClickIcon}
       />
       <div

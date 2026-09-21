@@ -7,7 +7,7 @@ import { InlineSvg } from "./InlineSvg";
 interface IconArtProps {
   /** Built widget component to render; takes priority over `svg`. */
   componentKey?: string;
-  /** Raw markup, for uploaded icons and widgets not yet converted. */
+  /** Raw markup, for library files not built into a component. */
   svg?: string;
   /** Colour theme id from lib/widgetThemes. */
   theme?: string;
@@ -15,9 +15,9 @@ interface IconArtProps {
 }
 
 /**
- * Renders a widget however it happens to be stored. Converted widgets are React
- * components; everything else is still markup, so both paths stay live until
- * the whole library is converted.
+ * Renders a widget however it happens to be stored. Built widgets are React
+ * components; a file dropped into public/icons is still markup, so both paths
+ * stay live.
  */
 export function IconArt({ componentKey, svg, theme, className }: IconArtProps) {
   const widget = getWidgetIcon(componentKey);
