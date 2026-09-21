@@ -25,7 +25,6 @@ export const CONVERTED_WIDGETS: readonly ConvertedWidget[] = [
   { key: "pressure-valve", file: "3.svg.svg.svg.svg.svg", label: "Pressure Valve" },
   { key: "submersible-pump", file: "4.svg.svg.svg.svg.svg", label: "Submersible Pump" },
   { key: "split-case-pump", file: "5.svg.svg.svg.svg.svg", label: "Split Case Pump" },
-  { key: "solenoid-valve", file: "6.svg.svg.svg.svg.svg", label: "Solenoid Valve" },
   { key: "pumpjack", file: "7.svg.svg.svg.svg.svg", label: "Pumpjack" },
   { key: "motor-driven-pump", file: "8.svg.svg.svg.svg.svg", label: "Motor Driven Pump" },
   { key: "linear-actuator", file: "9.svg.svg.svg.svg.svg", label: "Linear Actuator" },
