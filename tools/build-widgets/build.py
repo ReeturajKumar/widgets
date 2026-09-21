@@ -50,13 +50,24 @@ def extract_raster(name: str) -> Image.Image:
     raise SystemExit(f"no source image found for {name!r} in {ICONS}")
 
 
-def strip_background(im: Image.Image, flood_tol: int = 38, halo_tol: int = 26):
+def strip_background(
+    im: Image.Image,
+    flood_tol: int = 38,
+    halo_tol: int = 26,
+    halo_passes: int = 6,
+    pocket_erosion: int = 3,
+):
     """Clear the page background.
 
     Flooding inward from the corners protects light areas enclosed by the
-    drawing, which a plain colour match would punch holes in. A second pass then
-    clears the anti-aliased halo the flood leaves around the artwork, which is
-    what otherwise shows up as a pale fringe on a coloured board.
+    drawing, which a plain colour match would punch holes in. The flood leaves a
+    thin anti-aliased fringe behind, so a second stage eats that away.
+
+    Two things then remain: the thin anti-aliased fringe around the artwork, and
+    background pockets the flood could not reach because the drawing encloses
+    them. Both match the page colour, and so does some artwork — pale blue and
+    teal bodies especially. Size tells them apart: pockets and fringe survive an
+    erosion, scattered look-alike pixels inside the artwork do not.
     """
     im = im.convert("RGBA")
     w, h = im.size
@@ -87,10 +98,54 @@ def strip_background(im: Image.Image, flood_tol: int = 38, halo_tol: int = 26):
 
     pixels = np.array(im).astype(np.int16)
     rgb, alpha = pixels[..., :3], pixels[..., 3]
-    halo = np.zeros(alpha.shape, dtype=bool)
+
+    # Everything still opaque that matches the page colour. This is two
+    # different things at once: the anti-aliased fringe the flood left behind,
+    # and background pockets the flood could never reach because the drawing
+    # encloses them — the gaps inside a pump-jack frame, under a baseplate.
+    candidate = np.zeros(alpha.shape, dtype=bool)
     for ref in refs:
-        halo |= np.abs(rgb - np.array(ref, dtype=np.int16)).sum(-1) <= halo_tol
-    pixels[halo & (alpha > 0)] = [255, 255, 255, 0]
+        candidate |= np.abs(rgb - np.array(ref, dtype=np.int16)).sum(-1) <= halo_tol
+    candidate &= alpha > 0
+
+    def shift_or(m):
+        out = np.zeros_like(m)
+        out[1:, :] |= m[:-1, :]; out[:-1, :] |= m[1:, :]
+        out[:, 1:] |= m[:, :-1]; out[:, :-1] |= m[:, 1:]
+        return out
+
+    def shift_and(m):
+        out = m.copy()
+        out[1:, :] &= m[:-1, :]; out[:-1, :] &= m[1:, :]
+        out[:, 1:] &= m[:, :-1]; out[:, :-1] &= m[:, 1:]
+        return out
+
+    # Fringe: grow inward from what the flood cleared, a bounded few pixels.
+    clear = alpha == 0
+    for _ in range(halo_passes):
+        grown = clear | (shift_or(clear) & candidate)
+        if not grown[~clear].any():
+            break
+        clear = grown
+
+    # Pockets: erode the leftover candidates, which wipes out stray pixels that
+    # merely share the page's colour, then grow what survives back to its full
+    # extent. Artwork painted in a near-background tone speckles away under the
+    # erosion; a real pocket is far too broad to disappear.
+    leftover = candidate & ~clear
+    core = leftover
+    for _ in range(pocket_erosion):
+        core = shift_and(core)
+    if core.any():
+        pocket = core
+        while True:
+            grown = (pocket | shift_or(pocket)) & leftover
+            if grown.sum() == pocket.sum():
+                break
+            pocket = grown
+        clear |= pocket
+
+    pixels[clear] = [255, 255, 255, 0]
     return Image.fromarray(pixels.astype(np.uint8), "RGBA")
 
 

@@ -21,7 +21,7 @@ export function loadBuiltinIcons(): IconDef[] {
     componentKey: widget.key,
   }));
 
-  const raw = readdirSync(ICONS_DIR)
+  const raw = listIconFiles()
     .filter((file) => IMAGE_RE.test(file) && !CONVERTED_FILES.has(file))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .map((file) => {
@@ -35,6 +35,18 @@ export function loadBuiltinIcons(): IconDef[] {
     });
 
   return [...traced, ...raw];
+}
+
+// Every widget is a component now, so public/icons is empty and git does not
+// track empty directories — a fresh clone has no folder at all. Treating that
+// as "no extra icons" keeps the drop-in-a-file workflow alive without making
+// the page fall over when nobody has dropped one in.
+function listIconFiles(): string[] {
+  try {
+    return readdirSync(ICONS_DIR);
+  } catch {
+    return [];
+  }
 }
 
 function markupFor(file: string, name: string): string {

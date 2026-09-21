@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Pre-conversion icon backups (large)
 .icons-original/
+
+# Python bytecode from tools/
+__pycache__/

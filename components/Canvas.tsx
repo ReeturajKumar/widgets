@@ -142,6 +142,22 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
     [setNodes]
   );
 
+  const themeNode = useCallback(
+    (id: string, theme: string) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, theme } } : n))
+      );
+    },
+    [setNodes]
+  );
+
+  const themeAllNodes = useCallback(
+    (theme: string) => {
+      setNodes((nds) => nds.map((n) => ({ ...n, data: { ...n.data, theme } })));
+    },
+    [setNodes]
+  );
+
   const startReplace = useCallback((id: string) => {
     setReplacingNodeId(id);
   }, []);
@@ -274,7 +290,14 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
 
   return (
     <NodeActionsContext.Provider
-      value={{ deleteNode, startReplace, rotateNode, replacingNodeId }}
+      value={{
+        deleteNode,
+        startReplace,
+        rotateNode,
+        themeNode,
+        themeAllNodes,
+        replacingNodeId,
+      }}
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-zinc-200 bg-white px-4 py-2">
