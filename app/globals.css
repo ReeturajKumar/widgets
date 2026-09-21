@@ -26,3 +26,11 @@ body {
 .scrollbar-hidden::-webkit-scrollbar {
   display: none;
 }
+
+/* React Flow paints its edge-label layer below nodes, so the connection
+   delete button would be unclickable wherever a line passes under a widget —
+   the click lands on the node instead. The layer itself ignores pointer
+   events, so lifting it above the nodes only affects the button. */
+.react-flow__edgelabel-renderer {
+  z-index: 1001;
+}

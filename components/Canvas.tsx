@@ -16,11 +16,13 @@ import {
   useReactFlow,
   type Connection,
   type Edge,
+  type EdgeTypes,
   type Node,
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { DELETABLE_EDGE_TYPE, DeletableEdge } from "./DeletableEdge";
 import { IconNode, NODE_MIN_SIZE, type IconNodeData } from "./IconNode";
 import { NodeActionsContext } from "./NodeActionsContext";
 import {
@@ -32,6 +34,28 @@ import {
 import type { EdgeStyle, IconDef } from "../lib/types";
 
 const nodeTypes: NodeTypes = { iconNode: IconNode };
+const edgeTypes: EdgeTypes = { [DELETABLE_EDGE_TYPE]: DeletableEdge };
+
+// Boards saved before connections became deletable carry React Flow's built-in
+// edge types. Route them through the deletable edge, keeping the shape they
+// were drawn with, so old boards gain the delete button too.
+const VARIANT_BY_BUILTIN_TYPE: Record<string, EdgeStyle> = {
+  straight: "straight",
+  default: "bezier",
+  smoothstep: "step",
+};
+
+function asDeletable(edge: Edge): Edge {
+  if (edge.type === DELETABLE_EDGE_TYPE) return edge;
+  return {
+    ...edge,
+    type: DELETABLE_EDGE_TYPE,
+    data: {
+      ...edge.data,
+      variant: VARIANT_BY_BUILTIN_TYPE[edge.type ?? "default"] ?? "bezier",
+    },
+  };
+}
 
 const NODE_SIZE = NODE_MIN_SIZE;
 
@@ -86,7 +110,7 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
     }))
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(
-    initial.board?.edges ?? []
+    (initial.board?.edges ?? []).map(asDeletable)
   );
   const [edgeStyle, setEdgeStyle] = useState<EdgeStyle>(initial.edgeStyle);
   const [replacingNodeId, setReplacingNodeId] = useState<string | null>(null);
@@ -222,12 +246,12 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const { edgeType } = styleFor(edgeStyle);
       setEdges((eds) =>
         addEdge(
           {
             ...connection,
-            type: edgeType,
+            type: DELETABLE_EDGE_TYPE,
+            data: { variant: edgeStyle },
             markerEnd: { type: MarkerType.ArrowClosed },
           },
           eds
@@ -364,6 +388,8 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            deleteKeyCode={["Delete", "Backspace"]}
             connectionMode={ConnectionMode.Loose}
             connectionLineType={lineType}
             colorMode="light"
