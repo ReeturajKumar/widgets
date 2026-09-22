@@ -5,6 +5,9 @@ import { Handle, NodeResizer, Position, type NodeProps } from "@xyflow/react";
 import { useNodeActions } from "./NodeActionsContext";
 import { IconArt } from "./IconArt";
 import { DEFAULT_THEME_ID, WIDGET_THEMES } from "../lib/widgetThemes";
+import { ChartSettings } from "./graphs/ChartSettings";
+import { getGraph } from "./graphs/registry";
+import type { ChartOverride } from "./graphs/types";
 
 export interface IconNodeData extends Record<string, unknown> {
   name: string;
@@ -15,8 +18,23 @@ export interface IconNodeData extends Record<string, unknown> {
   /** Colour theme id from lib/widgetThemes. */
   theme?: string;
   rotation?: number;
+  /** Caption stored on a text-shape node; empty for every other node. */
+  text?: string;
+  /** Live axis + colour overrides for a chart node. */
+  chartConfig?: ChartOverride;
 }
 
+/** Registry key for the editable text shape. */
+export const TEXT_SHAPE_KEY = "shape-text";
+
+/** Minimum height the resizer allows. Low so a caption box or a short label
+ *  can be squeezed down — width and height are independent, so a shape can be
+ *  a long horizontal bar or a narrow vertical strip. */
+export const NODE_MIN_HEIGHT = 24;
+/** Minimum width the resizer allows. */
+export const NODE_MIN_WIDTH = 24;
+
+/** Placement default when a tile does not declare its own size. */
 export const NODE_MIN_SIZE = 70;
 
 const handleClass =
@@ -29,18 +47,50 @@ export function IconNode({ id, data, selected }: NodeProps) {
     componentKey,
     theme = DEFAULT_THEME_ID,
     rotation = 0,
+    text = "",
+    chartConfig = {},
   } = data as IconNodeData;
+  const isTextShape = componentKey === TEXT_SHAPE_KEY;
+  const graph = getGraph(componentKey);
   const {
     deleteNode,
     startReplace,
     rotateNode,
     themeNode,
     themeAllNodes,
+    updateText,
+    updateChartConfig,
+    bringToFront,
     replacingNodeId,
   } = useNodeActions();
   const [hovered, setHovered] = useState(false);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Bring node to top of React Flow array whenever settings or theme opens
+  useEffect(() => {
+    if (settingsOpen || themeOpen) {
+      bringToFront(id);
+    }
+  }, [settingsOpen, themeOpen, id, bringToFront]);
+
+  // Keep the active node and its settings/theme popover at the absolute top stacking context
+  // (2147483647 = maximum 32-bit signed CSS z-index) above all other nodes, shapes, and edges.
+  useEffect(() => {
+    if (!settingsOpen && !themeOpen) return;
+    const flowNode = rootRef.current?.closest(".react-flow__node") as HTMLElement | null;
+    if (!flowNode) return;
+    const prevZIndex = flowNode.style.zIndex;
+    flowNode.style.setProperty("z-index", "2147483647", "important");
+    return () => {
+      if (prevZIndex) {
+        flowNode.style.setProperty("z-index", prevZIndex);
+      } else {
+        flowNode.style.removeProperty("z-index");
+      }
+    };
+  });
 
   // The picker is positioned above the node, outside its box, so closing on
   // mouse-leave would pull it out from under the pointer on the way there.
@@ -71,7 +121,11 @@ export function IconNode({ id, data, selected }: NodeProps) {
     <div
       ref={rootRef}
       title={name}
-      className={`group relative flex h-full w-full flex-col items-center rounded-lg border-2 bg-white p-1 shadow-sm ${
+      className={`group relative flex h-full w-full flex-col items-center ${
+        isTextShape
+          ? "rounded-none border bg-white"
+          : "rounded-lg border-2 bg-white p-1 shadow-sm"
+      } ${
         isReplacing
           ? "border-amber-400 ring-2 ring-amber-300 ring-offset-1 animate-pulse"
           : selected
@@ -82,8 +136,11 @@ export function IconNode({ id, data, selected }: NodeProps) {
       onMouseLeave={() => setHovered(false)}
     >
       <NodeResizer
-        minWidth={NODE_MIN_SIZE}
-        minHeight={NODE_MIN_SIZE}
+        minWidth={NODE_MIN_WIDTH}
+        minHeight={NODE_MIN_HEIGHT}
+        // Resize handles on every corner AND every edge — corners change width
+        // and height together, edges change only one, so the same node can go
+        // wider without getting taller.
         isVisible={selected && !replacingNodeId}
         lineClassName="!border-blue-400"
         handleClassName="!h-2 !w-2 !rounded-sm !border-white !bg-blue-500"
@@ -95,7 +152,7 @@ export function IconNode({ id, data, selected }: NodeProps) {
       <Handle type="source" position={Position.Left} id="left" className={handleClass} />
 
       {/* Hover action buttons — only when hovered and not in any replace mode */}
-      {(hovered || themeOpen) && !replacingNodeId && (
+      {(hovered || themeOpen || settingsOpen) && !replacingNodeId && (
         <div
           // nodrag/nopan: without them React Flow starts dragging the node on
           // pointerdown over these buttons, and a click that moves even a pixel
@@ -120,25 +177,49 @@ export function IconNode({ id, data, selected }: NodeProps) {
           </button>
 
 
-          {/* Colour theme button */}
-          <button
-            type="button"
-            title="Colour theme"
-            onClick={(e) => {
-              e.stopPropagation();
-              setThemeOpen((v) => !v);
-            }}
-            className={`flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-violet-100 hover:text-violet-600 ${
-              themeOpen ? "bg-violet-100 text-violet-600" : "text-zinc-500"
-            }`}
-          >
-            <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M8 1.5a6.5 6.5 0 1 0 0 13c.9 0 1.4-.6 1.4-1.3 0-.8-.7-1.2-.7-1.9 0-.5.4-.9 1-.9h1.2A3.6 3.6 0 0 0 14.5 6.8C14.5 3.8 11.6 1.5 8 1.5Z" />
-              <circle cx="5.2" cy="6" r=".9" fill="currentColor" stroke="none" />
-              <circle cx="8" cy="4.6" r=".9" fill="currentColor" stroke="none" />
-              <circle cx="10.9" cy="6" r=".9" fill="currentColor" stroke="none" />
-            </svg>
-          </button>
+          {/* Colour theme button (hidden on chart nodes) */}
+          {!graph && (
+            <button
+              type="button"
+              title="Colour theme"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!themeOpen) bringToFront(id);
+                setThemeOpen((v) => !v);
+              }}
+              className={`flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-violet-100 hover:text-violet-600 ${
+                themeOpen ? "bg-violet-100 text-violet-600" : "text-zinc-500"
+              }`}
+            >
+              <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 1.5a6.5 6.5 0 1 0 0 13c.9 0 1.4-.6 1.4-1.3 0-.8-.7-1.2-.7-1.9 0-.5.4-.9 1-.9h1.2A3.6 3.6 0 0 0 14.5 6.8C14.5 3.8 11.6 1.5 8 1.5Z" />
+                <circle cx="5.2" cy="6" r=".9" fill="currentColor" stroke="none" />
+                <circle cx="8" cy="4.6" r=".9" fill="currentColor" stroke="none" />
+                <circle cx="10.9" cy="6" r=".9" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+          )}
+
+          {/* Chart settings button (chart nodes only) */}
+          {graph && (
+            <button
+              type="button"
+              title="Chart settings"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!settingsOpen) bringToFront(id);
+                setSettingsOpen((v) => !v);
+              }}
+              className={`flex h-3.5 w-3.5 items-center justify-center rounded-full hover:bg-blue-100 hover:text-blue-600 ${
+                settingsOpen ? "bg-blue-100 text-blue-600" : "text-zinc-500"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          )}
 
           {/* Replace button */}
           <button
@@ -175,10 +256,20 @@ export function IconNode({ id, data, selected }: NodeProps) {
       )}
 
 
-      {/* Colour theme picker */}
-      {themeOpen && (
+      {/* Chart settings popover */}
+      {graph && settingsOpen && (
+        <ChartSettings
+          graph={graph}
+          config={chartConfig}
+          onChange={(patch) => updateChartConfig(id, patch)}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {/* Colour theme picker (hidden on chart nodes) */}
+      {themeOpen && !graph && (
         <div
-          className="nodrag nopan absolute -top-14 left-1/2 z-30 w-max -translate-x-1/2 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 shadow-lg"
+          className="nodrag nopan absolute -top-14 left-1/2 z-[2147483647] w-max -translate-x-1/2 rounded-lg border border-zinc-200 bg-white px-2 py-1.5 shadow-lg"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center gap-1.5">
@@ -219,13 +310,153 @@ export function IconNode({ id, data, selected }: NodeProps) {
         className="flex min-h-0 w-full flex-1 items-center justify-center rounded-md transition-transform duration-150"
         style={{ transform: `rotate(${rotation}deg)` }}
       >
-        <IconArt
-          componentKey={componentKey}
-          svg={svg}
-          theme={theme}
-          className="h-full w-full [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_img]:h-full [&_img]:w-full [&_img]:object-contain"
-        />
+        {isTextShape ? (
+          <EditableText
+            value={text}
+            onChange={(value) => updateText(id, value)}
+          />
+        ) : (
+          <IconArt
+            componentKey={componentKey}
+            svg={svg}
+            theme={theme}
+            chartConfig={chartConfig}
+            className="h-full w-full [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_img]:h-full [&_img]:w-full [&_img]:object-contain"
+          />
+        )}
       </div>
     </div>
+  );
+}
+
+
+interface EditableTextProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+/**
+ * Text caption that enters edit mode on double-click.
+ *
+ * Uses a native <textarea> — contentEditable would let a stray keystroke drop
+ * arbitrary markup into the board. The textarea is invisible until the node is
+ * being edited (transparent chrome, no scrollbar); the empty state shows a
+ * placeholder so the caret has somewhere to land.
+ *
+ * Single click still selects the node — starting a drag over the textarea
+ * would otherwise select text instead. nodrag/nopan on the wrapper keeps React
+ * Flow from capturing keyboard input while typing.
+ */
+function EditableText({ value, onChange }: EditableTextProps) {
+  const [session, setSession] = useState<null | number>(null);
+  const editing = session !== null;
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [fontSize, setFontSize] = useState(13);
+
+  // Font sized against the current node height so the placeholder always
+  // fits. A ResizeObserver keeps it in step while a resize handle is
+  // dragged.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const rect = entries[0].contentRect;
+      // Half the height reads roomy; 6-20 keeps it legible at extremes.
+      const size = Math.max(6, Math.min(20, rect.height * 0.5));
+      setFontSize(size);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  function beginEditing(event: React.MouseEvent) {
+    event.stopPropagation();
+    setSession(Date.now());
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={editing ? "nodrag nopan h-full w-full" : "h-full w-full"}
+      onDoubleClick={beginEditing}
+    >
+      {editing ? (
+        <TextEditor
+          key={session}
+          initial={value}
+          fontSize={fontSize}
+          onCommit={(next) => {
+            setSession(null);
+            if (next !== value) onChange(next);
+          }}
+          onCancel={() => setSession(null)}
+        />
+      ) : (
+        <div
+          className={`flex h-full w-full items-center justify-center overflow-hidden whitespace-pre-wrap break-words px-1 text-center leading-tight ${
+            value ? "text-zinc-800" : "text-zinc-400"
+          }`}
+          style={{ fontSize: `${fontSize}px` }}
+          title="Double-click to edit"
+        >
+          {value || "Text"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface TextEditorProps {
+  initial: string;
+  fontSize: number;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+}
+
+/**
+ * Isolates the editing session so the surrounding node re-renders (theme
+ * changes, resizes) never wipe out what the user is typing. Mounts once per
+ * edit; `initial` seeds `draft` and is never read again.
+ */
+function TextEditor({ initial, fontSize, onCommit, onCancel }: TextEditorProps) {
+  const [draft, setDraft] = useState(initial);
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  const committed = useRef(false);
+
+  useEffect(() => {
+    const input = ref.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+  }, []);
+
+  function commit() {
+    if (committed.current) return;
+    committed.current = true;
+    onCommit(draft);
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      committed.current = true;
+      onCancel();
+    } else if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      commit();
+    }
+  }
+
+  return (
+    <textarea
+      ref={ref}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={handleKeyDown}
+      placeholder="Type text…"
+      style={{ fontSize: `${fontSize}px` }}
+      className="h-full w-full resize-none border-0 bg-transparent p-1 text-center leading-tight text-zinc-800 outline-none"
+    />
   );
 }

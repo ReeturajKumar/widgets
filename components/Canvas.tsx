@@ -24,6 +24,8 @@ import "@xyflow/react/dist/style.css";
 
 import { DELETABLE_EDGE_TYPE, DeletableEdge } from "./DeletableEdge";
 import { IconNode, NODE_MIN_SIZE, type IconNodeData } from "./IconNode";
+import { getGraph } from "./graphs/registry";
+import { getShape } from "./shapes/registry";
 import { NodeActionsContext } from "./NodeActionsContext";
 import {
   loadBoard,
@@ -58,6 +60,14 @@ function asDeletable(edge: Edge): Edge {
 }
 
 const NODE_SIZE = NODE_MIN_SIZE;
+
+// A monotonically-increasing z-index so a freshly placed node always renders
+// on top of anything already on the board.
+let nextNodeZ = 100;
+function claimTopZ(): number {
+  nextNodeZ += 1;
+  return nextNodeZ;
+}
 
 const EDGE_STYLE_OPTIONS: {
   value: EdgeStyle;
@@ -103,10 +113,12 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
   }));
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<IconNodeData>>(
-    ((initial.board?.nodes as Node<IconNodeData>[]) ?? []).map((n) => ({
+    ((initial.board?.nodes as Node<IconNodeData>[]) ?? []).map((n, index) => ({
       ...n,
       width: n.width ?? NODE_SIZE,
       height: n.height ?? NODE_SIZE,
+      zIndex:
+        typeof n.zIndex === "number" && n.zIndex < 100000 ? n.zIndex : index + 1,
     }))
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(
@@ -182,9 +194,51 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
     [setNodes]
   );
 
+  const updateText = useCallback(
+    (id: string, text: string) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, text } } : n))
+      );
+    },
+    [setNodes]
+  );
+
+  const updateChartConfig = useCallback(
+    (id: string, chartConfig: import("./graphs/types").ChartOverride) => {
+      setNodes((nds) =>
+        nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, chartConfig } } : n))
+      );
+    },
+    [setNodes]
+  );
+
   const startReplace = useCallback((id: string) => {
     setReplacingNodeId(id);
   }, []);
+
+  const bringToFront = useCallback(
+    (id: string) => {
+      setNodes((nds) => {
+        const node = nds.find((n) => n.id === id);
+        if (!node) return nds;
+        const otherNodes = nds.filter((n) => n.id !== id);
+        const maxZ = otherNodes.reduce(
+          (max, n) =>
+            Math.max(
+              max,
+              typeof n.zIndex === "number" && n.zIndex < 100000 ? n.zIndex : 0
+            ),
+          0
+        );
+        const topZ = maxZ + 1;
+        nextNodeZ = Math.max(nextNodeZ, topZ);
+        // Move to the end of the array so React Flow renders it LAST in the DOM,
+        // and assign it the highest zIndex.
+        return [...otherNodes, { ...node, zIndex: topZ }];
+      });
+    },
+    [setNodes]
+  );
 
   const placeIcon = useCallback(
     (icon: IconDef) => {
@@ -223,12 +277,18 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
         y: rect.top + rect.height / 2 + jitter(),
       });
 
+      const size = getGraph(icon.componentKey)?.defaultSize ??
+        getShape(icon.componentKey)?.defaultSize ?? {
+          width: NODE_SIZE,
+          height: NODE_SIZE,
+        };
       const newNode: Node<IconNodeData> = {
         id: `node-${crypto.randomUUID()}`,
         type: "iconNode",
         position,
-        width: NODE_SIZE,
-        height: NODE_SIZE,
+        width: size.width,
+        height: size.height,
+        zIndex: claimTopZ(),
         data: {
           name: icon.name,
           svg: icon.svg,
@@ -284,12 +344,18 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
         y: event.clientY,
       });
 
+      const size = getGraph(icon.componentKey)?.defaultSize ??
+        getShape(icon.componentKey)?.defaultSize ?? {
+          width: NODE_SIZE,
+          height: NODE_SIZE,
+        };
       const newNode: Node<IconNodeData> = {
         id: `node-${crypto.randomUUID()}`,
         type: "iconNode",
         position,
-        width: NODE_SIZE,
-        height: NODE_SIZE,
+        width: size.width,
+        height: size.height,
+        zIndex: claimTopZ(),
         data: {
           name: icon.name,
           svg: icon.svg,
@@ -318,8 +384,11 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
         deleteNode,
         startReplace,
         rotateNode,
+        updateText,
+        updateChartConfig,
         themeNode,
         themeAllNodes,
+        bringToFront,
         replacingNodeId,
       }}
     >
@@ -391,6 +460,9 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
             edgeTypes={edgeTypes}
             deleteKeyCode={["Delete", "Backspace"]}
             connectionMode={ConnectionMode.Loose}
+            // Selection must not reorder z — the newest placed node stays
+            // on top even if you click an older one behind it.
+            elevateNodesOnSelect={false}
             connectionLineType={lineType}
             colorMode="light"
             fitView
