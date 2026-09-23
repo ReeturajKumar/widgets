@@ -89,7 +89,7 @@ export function NavBar({
   }
 
   return (
-    <header className="relative flex h-16 items-stretch bg-gradient-to-r from-[#1e3a8a] via-[#1e40af] to-[#1e3a8a] text-white">
+    <header className="relative z-40 flex h-16 items-stretch overflow-visible bg-gradient-to-r from-[#1e3a8a] via-[#1e40af] to-[#1e3a8a] text-white">
       {/* Brand block */}
       <div className="flex items-center gap-2 px-5">
         <div className="flex flex-col leading-tight">
@@ -121,7 +121,7 @@ export function NavBar({
       </div>
 
       {/* Nav items */}
-      <nav className="flex flex-1 items-stretch justify-center gap-2">
+      <nav className="flex flex-1 items-stretch justify-center gap-2 overflow-visible">
         {config.navItems.map((item) => (
           <NavButton
             key={item.id}
@@ -264,8 +264,8 @@ function NavButton({ item, editable, onChange, onRemove }: NavButtonProps) {
   const showBadge = editable || (item.badge && item.badge.length > 0);
 
   return (
-    <div className="group/nav relative flex">
-      <div className="relative flex w-20 flex-col items-center justify-center gap-0.5 px-2 text-[11px] font-medium text-blue-100 hover:bg-blue-800">
+    <div className={`group/nav relative flex overflow-visible ${iconPickerOpen ? "z-50" : ""}`}>
+      <div className={`relative flex w-20 flex-col items-center justify-center gap-0.5 px-2 text-[11px] font-medium text-blue-100 hover:bg-blue-800 overflow-visible ${iconPickerOpen ? "bg-blue-800" : ""}`}>
         <button
           type="button"
           onClick={() => editable && setIconPickerOpen((v) => !v)}
@@ -318,13 +318,10 @@ function NavButton({ item, editable, onChange, onRemove }: NavButtonProps) {
       {iconPickerOpen && (
         <div
           ref={pickerRef}
-          // Explicit width so `grid-cols-4` always resolves to a 4-column
-          // layout even when the parent nav item is very narrow, and a
-          // higher z-index than the delete button so the picker sits on top.
-          style={{ width: 168 }}
-          className="absolute left-1/2 top-full z-[100] mt-1 -translate-x-1/2 rounded-md border border-zinc-200 bg-white p-1.5 text-zinc-700 shadow-xl"
+          style={{ width: 176 }}
+          className="absolute left-1/2 top-full z-[999999] mt-1.5 -translate-x-1/2 rounded-lg border border-zinc-200/90 bg-white p-2 text-zinc-700 shadow-2xl ring-1 ring-black/10"
         >
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-4 gap-1.5">
             {AVAILABLE_ICONS.map((icon) => (
               <button
                 key={icon}
@@ -334,10 +331,10 @@ function NavButton({ item, editable, onChange, onRemove }: NavButtonProps) {
                   setIconPickerOpen(false);
                 }}
                 title={icon}
-                className={`flex h-8 w-8 items-center justify-center rounded ${
+                className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
                   icon === item.icon
-                    ? "bg-blue-600 text-white"
-                    : "hover:bg-zinc-100"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "hover:bg-blue-50 text-zinc-700 hover:text-blue-600"
                 }`}
               >
                 <NavIconGlyph name={icon} className="h-4 w-4" />

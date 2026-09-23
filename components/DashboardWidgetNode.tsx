@@ -36,8 +36,9 @@ export function DashboardWidgetNode({ id, selected, data }: NodeProps) {
   return (
     <div
       ref={rootRef}
+      onPointerDown={() => bringToFront(id)}
       className={`group relative flex h-full w-full flex-col overflow-visible rounded-lg border-2 bg-white shadow-md transition-shadow ${
-        selected ? "border-blue-500 ring-2 ring-blue-200" : "border-zinc-300/80 hover:border-blue-400"
+        selected ? "border-blue-500 ring-2 ring-blue-200 z-50" : "border-zinc-300/80 hover:border-blue-400"
       }`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -75,7 +76,7 @@ export function DashboardWidgetNode({ id, selected, data }: NodeProps) {
       )}
 
       {/* Component viewport */}
-      <div className="min-h-0 w-full flex-1 overflow-auto rounded-md p-0.5">
+      <div className="min-h-0 w-full flex-1 overflow-visible rounded-md p-0.5">
         <Component storageKey={storageKey} editable={true} />
       </div>
     </div>
