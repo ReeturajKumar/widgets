@@ -158,22 +158,33 @@ export function IconPanel({
     onResizingChange?.(false);
   }, [onResizingChange]);
   function handleDragStart(event: DragEvent<HTMLDivElement>, icon: IconDef) {
+    const payload = JSON.stringify({ type: "icon", ...icon });
     event.dataTransfer.setData("application/x-widget-icon", JSON.stringify(icon));
-    event.dataTransfer.setData("text/plain", JSON.stringify({ type: "icon", ...icon }));
-    event.dataTransfer.effectAllowed = "all";
+    event.dataTransfer.setData("application/json", payload);
+    event.dataTransfer.setData("text/plain", payload);
+    event.dataTransfer.effectAllowed = "copy";
   }
 
   function handleDragDashboard(event: DragEvent<HTMLDivElement>, templateId: "soe" | "outage") {
+    const payload = JSON.stringify({ type: "dashboard", templateId });
     event.dataTransfer.setData("application/x-widget-dashboard", templateId);
-    event.dataTransfer.setData("text/plain", JSON.stringify({ type: "dashboard", templateId }));
-    event.dataTransfer.effectAllowed = "all";
+    event.dataTransfer.setData("application/json", payload);
+    event.dataTransfer.setData("text/plain", payload);
+    event.dataTransfer.effectAllowed = "copy";
   }
 
   function handleDragWidget(event: DragEvent<HTMLDivElement>, widgetKey: string, tile: IconDef) {
+    const payload = JSON.stringify({
+      type: "dashboard-widget",
+      widgetKey,
+      componentKey: widgetKey,
+      ...tile,
+    });
     event.dataTransfer.setData("application/x-widget-dashboard-component", widgetKey);
     event.dataTransfer.setData("application/x-widget-icon", JSON.stringify(tile));
-    event.dataTransfer.setData("text/plain", JSON.stringify({ type: "dashboard-widget", widgetKey, ...tile }));
-    event.dataTransfer.effectAllowed = "all";
+    event.dataTransfer.setData("application/json", payload);
+    event.dataTransfer.setData("text/plain", payload);
+    event.dataTransfer.effectAllowed = "copy";
   }
 
   return (
@@ -307,7 +318,7 @@ export function IconPanel({
                           role="button"
                           tabIndex={0}
                           onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
-                          className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-1.5 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                          className="group flex cursor-grab active:cursor-grabbing select-none items-center justify-between rounded-md border border-zinc-200 bg-white p-1.5 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
                         >
                           <div className="min-w-0 flex-1 pr-1.5">
                             <div className="flex items-center gap-1">
@@ -455,9 +466,9 @@ export function IconPanel({
                     onClick={() => onOpenDashboard?.("soe")}
                     onKeyDown={(e) => e.key === "Enter" && onOpenDashboard?.("soe")}
                     onDragStart={(event) => handleDragDashboard(event, "soe")}
-                    className="group cursor-pointer overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                    className="group cursor-grab active:cursor-grabbing select-none overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
                   >
-                    <div className="mb-1.5 flex h-16 items-center justify-center rounded bg-gradient-to-br from-blue-50 to-white">
+                    <div className="mb-1.5 flex h-16 items-center justify-center rounded bg-gradient-to-br from-blue-50 to-white pointer-events-none">
                       <svg
                         viewBox="0 0 160 100"
                         className="h-full w-full"
@@ -500,9 +511,9 @@ export function IconPanel({
                     onClick={() => onOpenDashboard?.("outage")}
                     onKeyDown={(e) => e.key === "Enter" && onOpenDashboard?.("outage")}
                     onDragStart={(event) => handleDragDashboard(event, "outage")}
-                    className="group cursor-pointer overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                    className="group cursor-grab active:cursor-grabbing select-none overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
                   >
-                    <div className="mb-1.5 flex h-16 items-center justify-center rounded bg-gradient-to-br from-amber-50/50 to-blue-50/50">
+                    <div className="mb-1.5 flex h-16 items-center justify-center rounded bg-gradient-to-br from-amber-50/50 to-blue-50/50 pointer-events-none">
                       <svg
                         viewBox="0 0 160 100"
                         className="h-full w-full"
@@ -567,7 +578,7 @@ export function IconPanel({
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
-                        className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                        className="group flex cursor-grab active:cursor-grabbing select-none items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
                       >
                         <div className="min-w-0 flex-1 pr-2">
                           <div className="flex items-center gap-1.5">
@@ -624,7 +635,7 @@ export function IconPanel({
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
-                        className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                        className="group flex cursor-grab active:cursor-grabbing select-none items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
                       >
                         <div className="min-w-0 flex-1 pr-2">
                           <div className="flex items-center gap-1.5">
@@ -681,7 +692,7 @@ export function IconPanel({
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
-                        className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                        className="group flex cursor-grab active:cursor-grabbing select-none items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
                       >
                         <div className="min-w-0 flex-1 pr-2">
                           <div className="flex items-center gap-1.5">

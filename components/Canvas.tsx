@@ -423,21 +423,28 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
 
   const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = "copy";
   }, []);
 
   const onDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      event.stopPropagation();
+
+      const flowPos = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
 
       // 1. Full Dashboard template drop
       const dashboardTemplate = event.dataTransfer.getData("application/x-widget-dashboard");
       if (dashboardTemplate) {
         const templateId = (dashboardTemplate === "outage" ? "outage" : "soe") as "soe" | "outage";
-        const dropAt = screenToFlowPosition({
-          x: event.clientX - 640,
-          y: event.clientY - 40,
-        });
+        const dropAt = {
+          x: flowPos.x - 640,
+          y: flowPos.y - 40,
+        };
         setNodes((nds) => nds.concat(makeDashboardNode(dropAt, templateId)));
         return;
       }
@@ -448,10 +455,10 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
         const widget = getDashboardWidget(widgetKey);
         const w = widget?.defaultSize.width ?? 500;
         const h = widget?.defaultSize.height ?? 300;
-        const dropAt = screenToFlowPosition({
-          x: event.clientX - w / 2,
-          y: event.clientY - h / 2,
-        });
+        const dropAt = {
+          x: flowPos.x - w / 2,
+          y: flowPos.y - h / 2,
+        };
         setNodes((nds) => nds.concat(makeDashboardWidgetNode(dropAt, widgetKey)));
         return;
       }
@@ -465,10 +472,10 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
           if (dashboardWidget) {
             const w = dashboardWidget.defaultSize.width;
             const h = dashboardWidget.defaultSize.height;
-            const dropAt = screenToFlowPosition({
-              x: event.clientX - w / 2,
-              y: event.clientY - h / 2,
-            });
+            const dropAt = {
+              x: flowPos.x - w / 2,
+              y: flowPos.y - h / 2,
+            };
             setNodes((nds) => nds.concat(makeDashboardWidgetNode(dropAt, icon.componentKey!)));
             return;
           }
@@ -481,10 +488,10 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
           const newNode: Node<IconNodeData> = {
             id: `node-${crypto.randomUUID()}`,
             type: "iconNode",
-            position: screenToFlowPosition({
-              x: event.clientX - size.width / 2,
-              y: event.clientY - size.height / 2,
-            }),
+            position: {
+              x: flowPos.x - size.width / 2,
+              y: flowPos.y - size.height / 2,
+            },
             width: size.width,
             height: size.height,
             zIndex: claimTopZ(),
@@ -501,17 +508,18 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
         }
       }
 
-      // 4. Fallback: text/plain JSON payload
-      const textData = event.dataTransfer.getData("text/plain");
+      // 4. Fallback: application/json or text/plain JSON payload
+      const textData = event.dataTransfer.getData("application/json") || event.dataTransfer.getData("text/plain");
       if (textData) {
         try {
           const parsed = JSON.parse(textData);
           if (parsed.type === "dashboard" || parsed.templateId) {
-            const dropAt = screenToFlowPosition({
-              x: event.clientX - 640,
-              y: event.clientY - 40,
-            });
-            setNodes((nds) => nds.concat(makeDashboardNode(dropAt, parsed.templateId || "soe")));
+            const templateId = (parsed.templateId === "outage" ? "outage" : "soe") as "soe" | "outage";
+            const dropAt = {
+              x: flowPos.x - 640,
+              y: flowPos.y - 40,
+            };
+            setNodes((nds) => nds.concat(makeDashboardNode(dropAt, templateId)));
             return;
           }
 
@@ -520,11 +528,37 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
             const widget = getDashboardWidget(key);
             const w = widget?.defaultSize.width ?? 500;
             const h = widget?.defaultSize.height ?? 300;
-            const dropAt = screenToFlowPosition({
-              x: event.clientX - w / 2,
-              y: event.clientY - h / 2,
-            });
+            const dropAt = {
+              x: flowPos.x - w / 2,
+              y: flowPos.y - h / 2,
+            };
             setNodes((nds) => nds.concat(makeDashboardWidgetNode(dropAt, key)));
+            return;
+          }
+
+          if (parsed.name || parsed.svg || parsed.componentKey) {
+            const size = getGraph(parsed.componentKey)?.defaultSize ??
+              getShape(parsed.componentKey)?.defaultSize ?? {
+                width: NODE_SIZE,
+                height: NODE_SIZE,
+              };
+            const newNode: Node<IconNodeData> = {
+              id: `node-${crypto.randomUUID()}`,
+              type: "iconNode",
+              position: {
+                x: flowPos.x - size.width / 2,
+                y: flowPos.y - size.height / 2,
+              },
+              width: size.width,
+              height: size.height,
+              zIndex: claimTopZ(),
+              data: {
+                name: parsed.name ?? "Node",
+                svg: parsed.svg,
+                componentKey: parsed.componentKey,
+              },
+            };
+            setNodes((nds) => nds.concat(newNode));
             return;
           }
         } catch {
@@ -623,6 +657,8 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onDragOver={onDragOver}
+            onDrop={onDrop}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             deleteKeyCode={["Delete", "Backspace"]}
