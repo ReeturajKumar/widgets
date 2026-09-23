@@ -5,7 +5,7 @@ import { useCallback, useRef, useState, type DragEvent, type PointerEvent as Rea
 // The sidebar groups its content into tabs. Components holds the widget
 // library; General is a slot for later — a future set of primitives (labels,
 // notes, connectors) will slot in without changing the sidebar shell.
-export type SidebarTab = "components" | "general" | "modals" | "graphs";
+export type SidebarTab = "components" | "general" | "modals" | "graphs" | "dashboard";
 
 // Popup modal previews shown in the Modals tab. Each entry is a tile that
 // opens its own modal; adding a new modal here means one row and one component.
@@ -66,6 +66,7 @@ const TABS: { id: SidebarTab; label: string }[] = [
   { id: "general", label: "General" },
   { id: "modals", label: "Modals" },
   { id: "graphs", label: "Graphs" },
+  { id: "dashboard", label: "Dashboard" },
 ];
 import type { IconDef } from "../lib/types";
 import { IconArt } from "./IconArt";
@@ -85,6 +86,10 @@ interface IconPanelProps {
   /** Fired as a drag starts and ends, so the canvas can drop its transition. */
   onResizingChange?: (resizing: boolean) => void;
   onClickIcon: (icon: IconDef) => void;
+  /** Fired whenever the active sidebar tab changes. */
+  onTabChange?: (tab: SidebarTab) => void;
+  /** Fired when the user clicks or drops the Dashboard tile. */
+  onOpenDashboard?: () => void;
 }
 
 /** Default open width, and the bounds a drag may resize between. */
@@ -105,6 +110,8 @@ export function IconPanel({
   onWidthChange,
   onResizingChange,
   onClickIcon,
+  onTabChange,
+  onOpenDashboard,
 }: IconPanelProps) {
   const [resizing, setResizing] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("components");
@@ -208,7 +215,7 @@ export function IconPanel({
                   type="button"
                   role="tab"
                   aria-selected={active}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => { setActiveTab(tab.id); onTabChange?.(tab.id); }}
                   className={`flex-1 border-b-2 px-2 py-2 text-[11px] font-medium transition-colors ${active
                     ? "border-blue-500 text-blue-600"
                     : "border-transparent text-zinc-500 hover:text-zinc-700"
@@ -296,6 +303,74 @@ export function IconPanel({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "dashboard" && (
+            <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-2">
+              <p className="mb-2 px-1 text-[10px] text-zinc-400">
+                Click to open · or drag onto the board
+              </p>
+              <div
+                role="button"
+                tabIndex={0}
+                draggable
+                onClick={() => onOpenDashboard?.()}
+                onKeyDown={(e) => e.key === "Enter" && onOpenDashboard?.()}
+                onDragStart={(event) => {
+                  event.dataTransfer.setData(
+                    "application/x-widget-dashboard",
+                    "1"
+                  );
+                  event.dataTransfer.effectAllowed = "copy";
+                }}
+                className="group cursor-pointer overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98]"
+              >
+                <div className="mb-1.5 flex h-24 items-center justify-center rounded bg-gradient-to-br from-blue-50 to-white">
+                  <svg
+                    viewBox="0 0 160 100"
+                    className="h-full w-full"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <rect width="160" height="14" fill="#1e3a8a" />
+                    <rect x="6" y="20" width="100" height="4" rx="1" fill="#dc2626" />
+                    <rect x="6" y="28" width="60" height="3" rx="1" fill="#9ca3af" />
+                    <rect x="6" y="36" width="148" height="20" rx="2" fill="#eff6ff" stroke="#bfdbfe" strokeWidth="0.6" />
+                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                      <rect
+                        key={i}
+                        x={9 + i * 24}
+                        y={40}
+                        width={20}
+                        height={12}
+                        rx={1.5}
+                        fill="#ffffff"
+                        stroke="#e5e7eb"
+                        strokeWidth="0.4"
+                      />
+                    ))}
+                    <rect x="6" y="60" width="100" height="34" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
+                    <rect x="110" y="60" width="44" height="34" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
+                    {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                      <rect
+                        key={i}
+                        x={8}
+                        y={64 + i * 4}
+                        width={96}
+                        height={2.5}
+                        rx={0.5}
+                        fill={i < 3 ? "#fecaca" : "#f3f4f6"}
+                      />
+                    ))}
+                  </svg>
+                </div>
+                <div className="text-[11px] font-semibold text-zinc-800">
+                  SEQUENCE OF EVENTS (SOE)
+                </div>
+                <div className="mt-0.5 text-[10px] text-zinc-500">
+                  AUTRIXA Distribution SCADA template
+                </div>
               </div>
             </div>
           )}

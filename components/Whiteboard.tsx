@@ -35,6 +35,10 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
   });
 
   const [resizing, setResizing] = useState(false);
+  const placeDashboardRef = useRef<(() => void) | null>(null);
+  const handleRegisterPlaceDashboard = useCallback((fn: () => void) => {
+    placeDashboardRef.current = fn;
+  }, []);
 
   const addIconRef = useRef<((icon: IconDef) => void) | null>(null);
 
@@ -74,6 +78,7 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
         onWidthChange={setSidebarWidth}
         onResizingChange={setResizing}
         onClickIcon={handleClickIcon}
+        onOpenDashboard={() => placeDashboardRef.current?.()}
       />
       <div
         className={`flex min-h-0 min-w-0 flex-1 flex-col ${
@@ -83,7 +88,10 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
         }`}
         style={{ marginLeft: layoutWidth }}
       >
-        <Canvas onRegisterAdd={handleRegisterAdd} />
+        <Canvas
+          onRegisterAdd={handleRegisterAdd}
+          onRegisterPlaceDashboard={handleRegisterPlaceDashboard}
+        />
       </div>
     </div>
   );

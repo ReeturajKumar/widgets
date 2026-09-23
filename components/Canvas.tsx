@@ -23,6 +23,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import { DELETABLE_EDGE_TYPE, DeletableEdge } from "./DeletableEdge";
+import { DashboardNode } from "./DashboardNode";
 import { IconNode, NODE_MIN_SIZE, type IconNodeData } from "./IconNode";
 import { getGraph } from "./graphs/registry";
 import { getShape } from "./shapes/registry";
@@ -35,7 +36,7 @@ import {
 } from "../lib/storage";
 import type { EdgeStyle, IconDef } from "../lib/types";
 
-const nodeTypes: NodeTypes = { iconNode: IconNode };
+const nodeTypes: NodeTypes = { iconNode: IconNode, dashboardNode: DashboardNode };
 const edgeTypes: EdgeTypes = { [DELETABLE_EDGE_TYPE]: DeletableEdge };
 
 // Boards saved before connections became deletable carry React Flow's built-in
@@ -68,6 +69,26 @@ function claimTopZ(): number {
   nextNodeZ += 1;
   return nextNodeZ;
 }
+
+// Node factory for a fresh dashboard drop. Kept next to the placement
+// code so a size change lands in exactly one place.
+function makeDashboardNode(
+  position: { x: number; y: number }
+): Node<IconNodeData> {
+  // Dashboard nodes have no icon-specific fields, but they share the same
+  // Node<IconNodeData> collection so the shared setNodes API works — a name is
+  // all the required IconNodeData shape asks for.
+  return {
+    id: `dashboard-${crypto.randomUUID()}`,
+    type: "dashboardNode",
+    position,
+    width: 1280,
+    height: 820,
+    zIndex: claimTopZ(),
+    data: { name: "SCADA Dashboard" },
+  };
+}
+
 
 const EDGE_STYLE_OPTIONS: {
   value: EdgeStyle;
@@ -104,9 +125,10 @@ function styleFor(edgeStyle: EdgeStyle) {
 
 interface CanvasInnerProps {
   onRegisterAdd: (fn: (icon: IconDef) => void) => void;
+  onRegisterPlaceDashboard?: (fn: () => void) => void;
 }
 
-function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
+function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerProps) {
   const [initial] = useState(() => ({
     board: loadBoard(),
     edgeStyle: loadEdgeStyle() ?? ("bezier" as EdgeStyle),
@@ -300,6 +322,21 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
     [replacingNodeId, screenToFlowPosition, setNodes]
   );
 
+  const placeDashboard = useCallback(() => {
+    // Land the dashboard roughly at the visible canvas centre. The exact
+    // position isn't important — the user drags it wherever they want.
+    const pane = document.querySelector<HTMLElement>(".react-flow__pane");
+    const rect = pane?.getBoundingClientRect();
+    const cx = rect ? rect.x + rect.width / 2 : window.innerWidth / 2;
+    const cy = rect ? rect.y + rect.height / 2 : window.innerHeight / 2;
+    const position = screenToFlowPosition({ x: cx - 640, y: cy - 410 });
+    setNodes((nds) => nds.concat(makeDashboardNode(position)));
+  }, [screenToFlowPosition, setNodes]);
+
+  useEffect(() => {
+    onRegisterPlaceDashboard?.(placeDashboard);
+  }, [onRegisterPlaceDashboard, placeDashboard]);
+
   useEffect(() => {
     onRegisterAdd(placeIcon);
   }, [onRegisterAdd, placeIcon]);
@@ -329,6 +366,16 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
   const onDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
+      if (event.dataTransfer.getData("application/x-widget-dashboard")) {
+        const dropAt = screenToFlowPosition({
+          x: event.clientX - 640,
+          y: event.clientY - 40,
+        });
+        setNodes((nds) =>
+          nds.concat(makeDashboardNode(dropAt))
+        );
+        return;
+      }
       const raw = event.dataTransfer.getData("application/x-widget-icon");
       if (!raw) return;
 
@@ -479,12 +526,14 @@ function CanvasInner({ onRegisterAdd }: CanvasInnerProps) {
 
 interface CanvasProps {
   onRegisterAdd: (fn: (icon: IconDef) => void) => void;
+  /** Register a callback the parent can invoke to place a dashboard at the canvas centre. */
+  onRegisterPlaceDashboard?: (fn: () => void) => void;
 }
 
-export function Canvas({ onRegisterAdd }: CanvasProps) {
+export function Canvas({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasProps) {
   return (
     <ReactFlowProvider>
-      <CanvasInner onRegisterAdd={onRegisterAdd} />
+      <CanvasInner onRegisterAdd={onRegisterAdd} onRegisterPlaceDashboard={onRegisterPlaceDashboard} />
     </ReactFlowProvider>
   );
 }
