@@ -35,8 +35,8 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
   });
 
   const [resizing, setResizing] = useState(false);
-  const placeDashboardRef = useRef<(() => void) | null>(null);
-  const handleRegisterPlaceDashboard = useCallback((fn: () => void) => {
+  const placeDashboardRef = useRef<((templateId?: "soe" | "outage") => void) | null>(null);
+  const handleRegisterPlaceDashboard = useCallback((fn: (templateId?: "soe" | "outage") => void) => {
     placeDashboardRef.current = fn;
   }, []);
 
@@ -78,7 +78,7 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
         onWidthChange={setSidebarWidth}
         onResizingChange={setResizing}
         onClickIcon={handleClickIcon}
-        onOpenDashboard={() => placeDashboardRef.current?.()}
+        onOpenDashboard={(templateId) => placeDashboardRef.current?.(templateId)}
       />
       <div
         className={`flex min-h-0 min-w-0 flex-1 flex-col ${

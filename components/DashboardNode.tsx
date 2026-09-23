@@ -3,27 +3,28 @@
 import { NodeResizer, type NodeProps } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { DashboardPage } from "./dashboard/DashboardPage";
+import { OutageDashboardPage } from "./dashboard/outage/OutageDashboardPage";
 import { useNodeActions } from "./NodeActionsContext";
 
 /** Natural width the dashboard is designed at — the min-w in DashboardPage. */
 const NATURAL_WIDTH = 1280;
 
+export type DashboardTemplateId = "soe" | "outage";
+
 /**
- * React Flow node that hosts the entire SCADA / SOE dashboard.
- *
- * The dashboard renders at its natural 1280 px width and is scaled to fit the
- * node via CSS `zoom` — that keeps the whole layout visible when the node
- * shrinks and lets the user resize freely. Hover reveals a delete button; the
- * standard React Flow drag handle moves the node around the canvas.
+ * React Flow node that hosts the entire SCADA dashboard.
+ * Supports both Sequence of Events (SOE) and Outage Monitoring templates.
  */
-export function DashboardNode({ id, selected }: NodeProps) {
+export function DashboardNode({ id, selected, data }: NodeProps) {
   const { deleteNode } = useNodeActions();
   const [hovered, setHovered] = useState(false);
   const [scale, setScale] = useState(1);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
-  // Fit the dashboard to whatever width the node has been resized to. Clamped
-  // so the user doesn't accidentally turn it into an unreadable smear.
+  const initialTemplate = ((data as Record<string, unknown>)?.templateId as DashboardTemplateId) || "soe";
+  const [template, setTemplate] = useState<DashboardTemplateId>(initialTemplate);
+
+  // Fit the dashboard to whatever width the node has been resized to.
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
@@ -51,6 +52,7 @@ export function DashboardNode({ id, selected }: NodeProps) {
         lineClassName="!border-blue-400"
       />
 
+      {/* Delete button on hover */}
       {hovered && (
         <button
           type="button"
@@ -60,9 +62,7 @@ export function DashboardNode({ id, selected }: NodeProps) {
           }}
           title="Remove dashboard"
           aria-label="Remove dashboard"
-          // nodrag/nopan so React Flow doesn't start a pan when the pointer
-          // presses on this button.
-          className="nodrag nopan absolute right-2 top-2 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-red-600 shadow hover:bg-red-500 hover:text-white"
+          className="nodrag nopan absolute top-2 right-2 z-30 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-red-600 shadow hover:bg-red-500 hover:text-white"
         >
           <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <line x1="1" y1="1" x2="13" y2="13" />
@@ -72,13 +72,10 @@ export function DashboardNode({ id, selected }: NodeProps) {
       )}
 
       <div
-        // Non-standard `zoom` beats `transform: scale` here: it scales layout
-        // too, so the wrapper's height/scroll matches what the user sees. All
-        // major evergreen browsers support it now.
         style={{ zoom: scale }}
         className="h-full w-full overflow-auto"
       >
-        <DashboardPage />
+        {template === "outage" ? <OutageDashboardPage /> : <DashboardPage />}
       </div>
     </div>
   );

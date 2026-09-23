@@ -24,9 +24,11 @@ import "@xyflow/react/dist/style.css";
 
 import { DELETABLE_EDGE_TYPE, DeletableEdge } from "./DeletableEdge";
 import { DashboardNode } from "./DashboardNode";
+import { DashboardWidgetNode } from "./DashboardWidgetNode";
 import { IconNode, NODE_MIN_SIZE, type IconNodeData } from "./IconNode";
 import { getGraph } from "./graphs/registry";
 import { getShape } from "./shapes/registry";
+import { getDashboardWidget } from "./dashboard/widgetRegistry";
 import { NodeActionsContext } from "./NodeActionsContext";
 import {
   loadBoard,
@@ -36,7 +38,11 @@ import {
 } from "../lib/storage";
 import type { EdgeStyle, IconDef } from "../lib/types";
 
-const nodeTypes: NodeTypes = { iconNode: IconNode, dashboardNode: DashboardNode };
+const nodeTypes: NodeTypes = {
+  iconNode: IconNode,
+  dashboardNode: DashboardNode,
+  dashboardWidgetNode: DashboardWidgetNode,
+};
 const edgeTypes: EdgeTypes = { [DELETABLE_EDGE_TYPE]: DeletableEdge };
 
 // Boards saved before connections became deletable carry React Flow's built-in
@@ -73,11 +79,9 @@ function claimTopZ(): number {
 // Node factory for a fresh dashboard drop. Kept next to the placement
 // code so a size change lands in exactly one place.
 function makeDashboardNode(
-  position: { x: number; y: number }
+  position: { x: number; y: number },
+  templateId: "soe" | "outage" = "soe"
 ): Node<IconNodeData> {
-  // Dashboard nodes have no icon-specific fields, but they share the same
-  // Node<IconNodeData> collection so the shared setNodes API works — a name is
-  // all the required IconNodeData shape asks for.
   return {
     id: `dashboard-${crypto.randomUUID()}`,
     type: "dashboardNode",
@@ -85,7 +89,31 @@ function makeDashboardNode(
     width: 1280,
     height: 820,
     zIndex: claimTopZ(),
-    data: { name: "SCADA Dashboard" },
+    data: {
+      name: templateId === "outage" ? "Outage Monitoring" : "SCADA Dashboard",
+      templateId,
+    },
+  };
+}
+
+function makeDashboardWidgetNode(
+  position: { x: number; y: number },
+  widgetKey: string
+): Node<IconNodeData> {
+  const widget = getDashboardWidget(widgetKey);
+  const size = widget?.defaultSize ?? { width: 500, height: 300 };
+  return {
+    id: `dashwidget-${crypto.randomUUID()}`,
+    type: "dashboardWidgetNode",
+    position,
+    width: size.width,
+    height: size.height,
+    zIndex: claimTopZ(),
+    data: {
+      name: widget?.label ?? "Dashboard Component",
+      widgetKey,
+      storageKey: `${widgetKey}.${crypto.randomUUID().slice(0, 8)}`,
+    },
   };
 }
 
@@ -299,6 +327,25 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
         y: rect.top + rect.height / 2 + jitter(),
       });
 
+      const dashboardWidget = getDashboardWidget(icon.componentKey);
+      if (dashboardWidget) {
+        const newNode: Node<IconNodeData> = {
+          id: `dashwidget-${crypto.randomUUID()}`,
+          type: "dashboardWidgetNode",
+          position,
+          width: dashboardWidget.defaultSize.width,
+          height: dashboardWidget.defaultSize.height,
+          zIndex: claimTopZ(),
+          data: {
+            name: dashboardWidget.label,
+            widgetKey: dashboardWidget.key,
+            storageKey: `${dashboardWidget.key}.${crypto.randomUUID().slice(0, 8)}`,
+          },
+        };
+        setNodes((nds) => nds.concat(newNode));
+        return;
+      }
+
       const size = getGraph(icon.componentKey)?.defaultSize ??
         getShape(icon.componentKey)?.defaultSize ?? {
           width: NODE_SIZE,
@@ -322,16 +369,32 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
     [replacingNodeId, screenToFlowPosition, setNodes]
   );
 
-  const placeDashboard = useCallback(() => {
-    // Land the dashboard roughly at the visible canvas centre. The exact
-    // position isn't important — the user drags it wherever they want.
-    const pane = document.querySelector<HTMLElement>(".react-flow__pane");
-    const rect = pane?.getBoundingClientRect();
-    const cx = rect ? rect.x + rect.width / 2 : window.innerWidth / 2;
-    const cy = rect ? rect.y + rect.height / 2 : window.innerHeight / 2;
-    const position = screenToFlowPosition({ x: cx - 640, y: cy - 410 });
-    setNodes((nds) => nds.concat(makeDashboardNode(position)));
-  }, [screenToFlowPosition, setNodes]);
+  const placeDashboard = useCallback(
+    (templateId: "soe" | "outage" = "soe") => {
+      const pane = document.querySelector<HTMLElement>(".react-flow__pane");
+      const rect = pane?.getBoundingClientRect();
+      const cx = rect ? rect.x + rect.width / 2 : window.innerWidth / 2;
+      const cy = rect ? rect.y + rect.height / 2 : window.innerHeight / 2;
+      const position = screenToFlowPosition({ x: cx - 640, y: cy - 410 });
+      setNodes((nds) => nds.concat(makeDashboardNode(position, templateId)));
+    },
+    [screenToFlowPosition, setNodes]
+  );
+
+  const placeDashboardWidget = useCallback(
+    (widgetKey: string) => {
+      const pane = document.querySelector<HTMLElement>(".react-flow__pane");
+      const rect = pane?.getBoundingClientRect();
+      const widget = getDashboardWidget(widgetKey);
+      const w = widget?.defaultSize.width ?? 500;
+      const h = widget?.defaultSize.height ?? 300;
+      const cx = rect ? rect.x + rect.width / 2 : window.innerWidth / 2;
+      const cy = rect ? rect.y + rect.height / 2 : window.innerHeight / 2;
+      const position = screenToFlowPosition({ x: cx - w / 2, y: cy - h / 2 });
+      setNodes((nds) => nds.concat(makeDashboardWidgetNode(position, widgetKey)));
+    },
+    [screenToFlowPosition, setNodes]
+  );
 
   useEffect(() => {
     onRegisterPlaceDashboard?.(placeDashboard);
@@ -360,57 +423,114 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
 
   const onDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
+    event.dataTransfer.dropEffect = "copy";
   }, []);
 
   const onDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      if (event.dataTransfer.getData("application/x-widget-dashboard")) {
+
+      // 1. Full Dashboard template drop
+      const dashboardTemplate = event.dataTransfer.getData("application/x-widget-dashboard");
+      if (dashboardTemplate) {
+        const templateId = (dashboardTemplate === "outage" ? "outage" : "soe") as "soe" | "outage";
         const dropAt = screenToFlowPosition({
           x: event.clientX - 640,
           y: event.clientY - 40,
         });
-        setNodes((nds) =>
-          nds.concat(makeDashboardNode(dropAt))
-        );
+        setNodes((nds) => nds.concat(makeDashboardNode(dropAt, templateId)));
         return;
       }
+
+      // 2. Standalone Dashboard Component drop
+      const widgetKey = event.dataTransfer.getData("application/x-widget-dashboard-component");
+      if (widgetKey) {
+        const widget = getDashboardWidget(widgetKey);
+        const w = widget?.defaultSize.width ?? 500;
+        const h = widget?.defaultSize.height ?? 300;
+        const dropAt = screenToFlowPosition({
+          x: event.clientX - w / 2,
+          y: event.clientY - h / 2,
+        });
+        setNodes((nds) => nds.concat(makeDashboardWidgetNode(dropAt, widgetKey)));
+        return;
+      }
+
+      // 3. Standard IconDef drop (could be equipment, graph, shape, or dashboard widget)
       const raw = event.dataTransfer.getData("application/x-widget-icon");
-      if (!raw) return;
+      if (raw) {
+        try {
+          const icon = JSON.parse(raw) as IconDef;
+          const dashboardWidget = getDashboardWidget(icon.componentKey);
+          if (dashboardWidget) {
+            const w = dashboardWidget.defaultSize.width;
+            const h = dashboardWidget.defaultSize.height;
+            const dropAt = screenToFlowPosition({
+              x: event.clientX - w / 2,
+              y: event.clientY - h / 2,
+            });
+            setNodes((nds) => nds.concat(makeDashboardWidgetNode(dropAt, icon.componentKey!)));
+            return;
+          }
 
-      let icon: IconDef;
-      try {
-        icon = JSON.parse(raw) as IconDef;
-      } catch {
-        return;
+          const size = getGraph(icon.componentKey)?.defaultSize ??
+            getShape(icon.componentKey)?.defaultSize ?? {
+              width: NODE_SIZE,
+              height: NODE_SIZE,
+            };
+          const newNode: Node<IconNodeData> = {
+            id: `node-${crypto.randomUUID()}`,
+            type: "iconNode",
+            position: screenToFlowPosition({
+              x: event.clientX - size.width / 2,
+              y: event.clientY - size.height / 2,
+            }),
+            width: size.width,
+            height: size.height,
+            zIndex: claimTopZ(),
+            data: {
+              name: icon.name,
+              svg: icon.svg,
+              componentKey: icon.componentKey,
+            },
+          };
+          setNodes((nds) => nds.concat(newNode));
+          return;
+        } catch {
+          // continue to fallback
+        }
       }
 
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
+      // 4. Fallback: text/plain JSON payload
+      const textData = event.dataTransfer.getData("text/plain");
+      if (textData) {
+        try {
+          const parsed = JSON.parse(textData);
+          if (parsed.type === "dashboard" || parsed.templateId) {
+            const dropAt = screenToFlowPosition({
+              x: event.clientX - 640,
+              y: event.clientY - 40,
+            });
+            setNodes((nds) => nds.concat(makeDashboardNode(dropAt, parsed.templateId || "soe")));
+            return;
+          }
 
-      const size = getGraph(icon.componentKey)?.defaultSize ??
-        getShape(icon.componentKey)?.defaultSize ?? {
-          width: NODE_SIZE,
-          height: NODE_SIZE,
-        };
-      const newNode: Node<IconNodeData> = {
-        id: `node-${crypto.randomUUID()}`,
-        type: "iconNode",
-        position,
-        width: size.width,
-        height: size.height,
-        zIndex: claimTopZ(),
-        data: {
-          name: icon.name,
-          svg: icon.svg,
-          componentKey: icon.componentKey,
-        },
-      };
-
-      setNodes((nds) => nds.concat(newNode));
+          const key = parsed.widgetKey || parsed.componentKey;
+          if (key && getDashboardWidget(key)) {
+            const widget = getDashboardWidget(key);
+            const w = widget?.defaultSize.width ?? 500;
+            const h = widget?.defaultSize.height ?? 300;
+            const dropAt = screenToFlowPosition({
+              x: event.clientX - w / 2,
+              y: event.clientY - h / 2,
+            });
+            setNodes((nds) => nds.concat(makeDashboardWidgetNode(dropAt, key)));
+            return;
+          }
+        } catch {
+          // ignore
+        }
+      }
     },
     [screenToFlowPosition, setNodes]
   );

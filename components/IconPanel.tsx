@@ -72,6 +72,7 @@ import type { IconDef } from "../lib/types";
 import { IconArt } from "./IconArt";
 import { GRAPHS } from "./graphs/registry";
 import { SHAPES } from "./shapes/registry";
+import { DASHBOARD_WIDGETS } from "./dashboard/widgetRegistry";
 import { SubmissionModal } from "./modals/SubmissionModal";
 import { SuccessModal } from "./modals/SuccessModal";
 import { BlockedModal } from "./modals/BlockedModal";
@@ -88,8 +89,8 @@ interface IconPanelProps {
   onClickIcon: (icon: IconDef) => void;
   /** Fired whenever the active sidebar tab changes. */
   onTabChange?: (tab: SidebarTab) => void;
-  /** Fired when the user clicks or drops the Dashboard tile. */
-  onOpenDashboard?: () => void;
+  /** Fired when the user clicks or drops a Dashboard template tile. */
+  onOpenDashboard?: (templateId?: "soe" | "outage") => void;
 }
 
 /** Default open width, and the bounds a drag may resize between. */
@@ -115,6 +116,7 @@ export function IconPanel({
 }: IconPanelProps) {
   const [resizing, setResizing] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("components");
+  const [compCategory, setCompCategory] = useState<"all" | "scada" | "equipment">("all");
   const [openModal, setOpenModal] = useState<ModalId | null>(null);
   const frame = useRef<number | null>(null);
 
@@ -156,11 +158,22 @@ export function IconPanel({
     onResizingChange?.(false);
   }, [onResizingChange]);
   function handleDragStart(event: DragEvent<HTMLDivElement>, icon: IconDef) {
-    event.dataTransfer.setData(
-      "application/x-widget-icon",
-      JSON.stringify(icon)
-    );
-    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-widget-icon", JSON.stringify(icon));
+    event.dataTransfer.setData("text/plain", JSON.stringify({ type: "icon", ...icon }));
+    event.dataTransfer.effectAllowed = "all";
+  }
+
+  function handleDragDashboard(event: DragEvent<HTMLDivElement>, templateId: "soe" | "outage") {
+    event.dataTransfer.setData("application/x-widget-dashboard", templateId);
+    event.dataTransfer.setData("text/plain", JSON.stringify({ type: "dashboard", templateId }));
+    event.dataTransfer.effectAllowed = "all";
+  }
+
+  function handleDragWidget(event: DragEvent<HTMLDivElement>, widgetKey: string, tile: IconDef) {
+    event.dataTransfer.setData("application/x-widget-dashboard-component", widgetKey);
+    event.dataTransfer.setData("application/x-widget-icon", JSON.stringify(tile));
+    event.dataTransfer.setData("text/plain", JSON.stringify({ type: "dashboard-widget", widgetKey, ...tile }));
+    event.dataTransfer.effectAllowed = "all";
   }
 
   return (
@@ -228,41 +241,156 @@ export function IconPanel({
           </div>
 
           {activeTab === "components" && (
-            /* Widget grid */
-            <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-2">
-              <div
-                className="grid gap-2"
-                style={{
-                  gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))",
-                }}
-              >
-                {icons.map((icon) => (
-                  <div
-                    key={icon.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, icon)}
-                    onClick={() => onClickIcon(icon)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && onClickIcon(icon)}
-                    className="group relative flex cursor-pointer flex-col items-center gap-1 rounded-md border border-zinc-200 bg-white p-1.5 hover:border-blue-400 hover:bg-blue-50 active:scale-95"
-                  >
-                    <IconArt
-                      componentKey={icon.componentKey}
-                      svg={icon.svg}
-                      className="flex h-14 w-full items-center justify-center [&_svg]:h-full [&_svg]:w-full [&_img]:h-full [&_img]:w-full [&_img]:object-contain"
-                    />
-                    <span className="w-full truncate text-center text-[9px] leading-tight text-zinc-500">
-                      {icon.name}
+            <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-2 space-y-2.5">
+              {/* Category selector pills */}
+              <div className="flex items-center gap-1 rounded-md bg-zinc-200/60 p-0.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setCompCategory("all")}
+                  className={`flex-1 rounded py-0.5 text-center font-medium transition-colors ${
+                    compCategory === "all"
+                      ? "bg-white text-zinc-800 shadow-xs"
+                      : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCompCategory("scada")}
+                  className={`flex-1 rounded py-0.5 text-center font-medium transition-colors ${
+                    compCategory === "scada"
+                      ? "bg-white text-blue-600 shadow-xs font-semibold"
+                      : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                >
+                  SCADA Widgets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCompCategory("equipment")}
+                  className={`flex-1 rounded py-0.5 text-center font-medium transition-colors ${
+                    compCategory === "equipment"
+                      ? "bg-white text-zinc-800 shadow-xs"
+                      : "text-zinc-600 hover:text-zinc-900"
+                  }`}
+                >
+                  Pumps
+                </button>
+              </div>
+
+              {/* Standalone SCADA Dashboard Widgets Section */}
+              {(compCategory === "all" || compCategory === "scada") && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[10px] font-bold tracking-tight text-blue-950 uppercase">
+                      SCADA Dashboard Cards
+                    </span>
+                    <span className="text-[9px] text-zinc-400">
+                      Drag to board
                     </span>
                   </div>
-                ))}
-                {icons.length === 0 && (
-                  <p className="col-span-full py-4 text-center text-[11px] text-zinc-400">
-                    No components
-                  </p>
-                )}
-              </div>
+
+                  <div className="grid gap-1.5">
+                    {DASHBOARD_WIDGETS.map((w) => {
+                      const tile: IconDef = {
+                        id: `widget-${w.key}`,
+                        name: w.label,
+                        componentKey: w.key,
+                      };
+                      return (
+                        <div
+                          key={w.key}
+                          draggable
+                          onDragStart={(e) => handleDragWidget(e, w.key, tile)}
+                          onClick={() => onClickIcon(tile)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
+                          className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-1.5 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                        >
+                          <div className="min-w-0 flex-1 pr-1.5">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10.5px] font-semibold text-zinc-800 group-hover:text-blue-600 truncate">
+                                {w.label}
+                              </span>
+                              {w.badge && (
+                                <span className={`shrink-0 rounded px-1 py-0.1 text-[8px] font-semibold ${
+                                  w.category === "Outage Monitoring"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : w.category === "Sequence of Events (SOE)"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-purple-100 text-purple-800"
+                                }`}>
+                                  {w.badge}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[9px] text-zinc-500 truncate mt-0.5">
+                              {w.description}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-zinc-300 group-hover:text-blue-500">
+                            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="12" y1="5" x2="12" y2="19" />
+                              <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Standard Equipment Icons Grid */}
+              {(compCategory === "all" || compCategory === "equipment") && (
+                <div className="space-y-1.5">
+                  {compCategory === "all" && (
+                    <div className="flex items-center justify-between px-0.5 border-t border-zinc-200/80 pt-2">
+                      <span className="text-[10px] font-bold tracking-tight text-zinc-600 uppercase">
+                        Industrial Equipment
+                      </span>
+                      <span className="text-[9px] text-zinc-400">
+                        {icons.length} items
+                      </span>
+                    </div>
+                  )}
+                  <div
+                    className="grid gap-2"
+                    style={{
+                      gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))",
+                    }}
+                  >
+                    {icons.map((icon) => (
+                      <div
+                        key={icon.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, icon)}
+                        onClick={() => onClickIcon(icon)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && onClickIcon(icon)}
+                        className="group relative flex cursor-pointer flex-col items-center gap-1 rounded-md border border-zinc-200 bg-white p-1.5 hover:border-blue-400 hover:bg-blue-50 active:scale-95"
+                      >
+                        <IconArt
+                          componentKey={icon.componentKey}
+                          svg={icon.svg}
+                          className="flex h-14 w-full items-center justify-center [&_svg]:h-full [&_svg]:w-full [&_img]:h-full [&_img]:w-full [&_img]:object-contain"
+                        />
+                        <span className="w-full truncate text-center text-[9px] leading-tight text-zinc-500">
+                          {icon.name}
+                        </span>
+                      </div>
+                    ))}
+                    {icons.length === 0 && (
+                      <p className="col-span-full py-4 text-center text-[11px] text-zinc-400">
+                        No components
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -275,8 +403,6 @@ export function IconPanel({
                 }}
               >
                 {SHAPES.map((shape) => {
-                  // Each tile is an IconDef so the same click/drag handlers
-                  // that place widgets also place shapes.
                   const tile = {
                     id: shape.key,
                     name: shape.label,
@@ -308,68 +434,280 @@ export function IconPanel({
           )}
 
           {activeTab === "dashboard" && (
-            <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-2">
-              <p className="mb-2 px-1 text-[10px] text-zinc-400">
-                Click to open · or drag onto the board
-              </p>
-              <div
-                role="button"
-                tabIndex={0}
-                draggable
-                onClick={() => onOpenDashboard?.()}
-                onKeyDown={(e) => e.key === "Enter" && onOpenDashboard?.()}
-                onDragStart={(event) => {
-                  event.dataTransfer.setData(
-                    "application/x-widget-dashboard",
-                    "1"
-                  );
-                  event.dataTransfer.effectAllowed = "copy";
-                }}
-                className="group cursor-pointer overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98]"
-              >
-                <div className="mb-1.5 flex h-24 items-center justify-center rounded bg-gradient-to-br from-blue-50 to-white">
-                  <svg
-                    viewBox="0 0 160 100"
-                    className="h-full w-full"
-                    xmlns="http://www.w3.org/2000/svg"
+            <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-2 space-y-3.5">
+              {/* Full Templates Section */}
+              <div>
+                <div className="flex items-center justify-between px-1 mb-1.5">
+                  <span className="text-[10.5px] font-bold tracking-tight text-blue-950 uppercase">
+                    Full Templates
+                  </span>
+                  <span className="text-[9.5px] text-zinc-400">
+                    Click / Drag
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {/* Template 1: SOE */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    draggable
+                    onClick={() => onOpenDashboard?.("soe")}
+                    onKeyDown={(e) => e.key === "Enter" && onOpenDashboard?.("soe")}
+                    onDragStart={(event) => handleDragDashboard(event, "soe")}
+                    className="group cursor-pointer overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
                   >
-                    <rect width="160" height="14" fill="#1e3a8a" />
-                    <rect x="6" y="20" width="100" height="4" rx="1" fill="#dc2626" />
-                    <rect x="6" y="28" width="60" height="3" rx="1" fill="#9ca3af" />
-                    <rect x="6" y="36" width="148" height="20" rx="2" fill="#eff6ff" stroke="#bfdbfe" strokeWidth="0.6" />
-                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                      <rect
-                        key={i}
-                        x={9 + i * 24}
-                        y={40}
-                        width={20}
-                        height={12}
-                        rx={1.5}
-                        fill="#ffffff"
-                        stroke="#e5e7eb"
-                        strokeWidth="0.4"
-                      />
-                    ))}
-                    <rect x="6" y="60" width="100" height="34" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
-                    <rect x="110" y="60" width="44" height="34" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
-                    {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-                      <rect
-                        key={i}
-                        x={8}
-                        y={64 + i * 4}
-                        width={96}
-                        height={2.5}
-                        rx={0.5}
-                        fill={i < 3 ? "#fecaca" : "#f3f4f6"}
-                      />
-                    ))}
-                  </svg>
+                    <div className="mb-1.5 flex h-16 items-center justify-center rounded bg-gradient-to-br from-blue-50 to-white">
+                      <svg
+                        viewBox="0 0 160 100"
+                        className="h-full w-full"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect width="160" height="14" fill="#1e3a8a" />
+                        <rect x="6" y="20" width="100" height="4" rx="1" fill="#dc2626" />
+                        <rect x="6" y="28" width="60" height="3" rx="1" fill="#9ca3af" />
+                        <rect x="6" y="36" width="148" height="20" rx="2" fill="#eff6ff" stroke="#bfdbfe" strokeWidth="0.6" />
+                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                          <rect
+                            key={i}
+                            x={9 + i * 24}
+                            y={40}
+                            width={20}
+                            height={12}
+                            rx={1.5}
+                            fill="#ffffff"
+                            stroke="#e5e7eb"
+                            strokeWidth="0.4"
+                          />
+                        ))}
+                        <rect x="6" y="60" width="100" height="34" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
+                        <rect x="110" y="60" width="44" height="34" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
+                      </svg>
+                    </div>
+                    <div className="text-[11px] font-semibold text-zinc-800">
+                      SEQUENCE OF EVENTS (SOE)
+                    </div>
+                    <div className="mt-0.5 text-[9.5px] text-zinc-500">
+                      Complete AUTRIXA SCADA template
+                    </div>
+                  </div>
+
+                  {/* Template 2: Outage Monitoring */}
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    draggable
+                    onClick={() => onOpenDashboard?.("outage")}
+                    onKeyDown={(e) => e.key === "Enter" && onOpenDashboard?.("outage")}
+                    onDragStart={(event) => handleDragDashboard(event, "outage")}
+                    className="group cursor-pointer overflow-hidden rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                  >
+                    <div className="mb-1.5 flex h-16 items-center justify-center rounded bg-gradient-to-br from-amber-50/50 to-blue-50/50">
+                      <svg
+                        viewBox="0 0 160 100"
+                        className="h-full w-full"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect width="160" height="14" fill="#1e3a8a" />
+                        <rect x="6" y="18" width="80" height="3.5" rx="1" fill="#1e3a8a" />
+                        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                          <rect
+                            key={i}
+                            x={6 + i * 18.5}
+                            y={25}
+                            width={16.5}
+                            height={14}
+                            rx={1.5}
+                            fill="#ffffff"
+                            stroke={i === 0 || i === 4 ? "#fca5a5" : "#bfdbfe"}
+                            strokeWidth="0.5"
+                          />
+                        ))}
+                        <rect x="6" y="43" width="105" height="32" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
+                        <rect x="114" y="43" width="40" height="52" rx="2" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.6" />
+                        <rect x="6" y="78" width="33" height="17" rx="1.5" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.5" />
+                        <rect x="42" y="78" width="33" height="17" rx="1.5" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.5" />
+                        <rect x="78" y="78" width="33" height="17" rx="1.5" fill="#ffffff" stroke="#bfdbfe" strokeWidth="0.5" />
+                      </svg>
+                    </div>
+                    <div className="text-[11px] font-semibold text-zinc-800">
+                      OUTAGE MONITORING
+                    </div>
+                    <div className="mt-0.5 text-[9.5px] text-zinc-500">
+                      Real-time feeder outage &amp; restoration template
+                    </div>
+                  </div>
                 </div>
-                <div className="text-[11px] font-semibold text-zinc-800">
-                  SEQUENCE OF EVENTS (SOE)
+              </div>
+
+              {/* Separated Components: Outage Monitoring */}
+              <div>
+                <div className="flex items-center justify-between px-1 mb-1.5 border-t border-zinc-200/80 pt-2.5">
+                  <span className="text-[10.5px] font-bold tracking-tight text-blue-950 uppercase">
+                    Outage Widgets
+                  </span>
+                  <span className="text-[9px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded">
+                    7 Components
+                  </span>
                 </div>
-                <div className="mt-0.5 text-[10px] text-zinc-500">
-                  AUTRIXA Distribution SCADA template
+
+                <div className="space-y-1.5">
+                  {DASHBOARD_WIDGETS.filter((w) => w.category === "Outage Monitoring").map((w) => {
+                    const tile: IconDef = {
+                      id: `widget-${w.key}`,
+                      name: w.label,
+                      componentKey: w.key,
+                    };
+                    return (
+                      <div
+                        key={w.key}
+                        draggable
+                        onDragStart={(e) => handleDragWidget(e, w.key, tile)}
+                        onClick={() => onClickIcon(tile)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
+                        className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                      >
+                        <div className="min-w-0 flex-1 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-zinc-800 group-hover:text-blue-600 truncate">
+                              {w.label}
+                            </span>
+                            {w.badge && (
+                              <span className="shrink-0 rounded bg-blue-100/80 px-1 py-0.2 text-[8.5px] font-semibold text-blue-700">
+                                {w.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[9.5px] text-zinc-500 truncate mt-0.5">
+                            {w.description}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-zinc-400 group-hover:text-blue-500">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                          </svg>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Separated Components: SOE Widgets */}
+              <div>
+                <div className="flex items-center justify-between px-1 mb-1.5 border-t border-zinc-200/80 pt-2.5">
+                  <span className="text-[10.5px] font-bold tracking-tight text-blue-950 uppercase">
+                    SOE Widgets
+                  </span>
+                  <span className="text-[9px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+                    6 Components
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {DASHBOARD_WIDGETS.filter((w) => w.category === "Sequence of Events (SOE)").map((w) => {
+                    const tile: IconDef = {
+                      id: `widget-${w.key}`,
+                      name: w.label,
+                      componentKey: w.key,
+                    };
+                    return (
+                      <div
+                        key={w.key}
+                        draggable
+                        onDragStart={(e) => handleDragWidget(e, w.key, tile)}
+                        onClick={() => onClickIcon(tile)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
+                        className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                      >
+                        <div className="min-w-0 flex-1 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-zinc-800 group-hover:text-blue-600 truncate">
+                              {w.label}
+                            </span>
+                            {w.badge && (
+                              <span className="shrink-0 rounded bg-emerald-100/80 px-1 py-0.2 text-[8.5px] font-semibold text-emerald-800">
+                                {w.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[9.5px] text-zinc-500 truncate mt-0.5">
+                            {w.description}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-zinc-400 group-hover:text-blue-500">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                          </svg>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Headers & Navigation */}
+              <div>
+                <div className="flex items-center justify-between px-1 mb-1.5 border-t border-zinc-200/80 pt-2.5">
+                  <span className="text-[10.5px] font-bold tracking-tight text-blue-950 uppercase">
+                    Headers &amp; Nav
+                  </span>
+                  <span className="text-[9px] font-medium text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded">
+                    2 Components
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {DASHBOARD_WIDGETS.filter((w) => w.category === "Headers & Navigation").map((w) => {
+                    const tile: IconDef = {
+                      id: `widget-${w.key}`,
+                      name: w.label,
+                      componentKey: w.key,
+                    };
+                    return (
+                      <div
+                        key={w.key}
+                        draggable
+                        onDragStart={(e) => handleDragWidget(e, w.key, tile)}
+                        onClick={() => onClickIcon(tile)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
+                        className="group flex cursor-pointer items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                      >
+                        <div className="min-w-0 flex-1 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-zinc-800 group-hover:text-blue-600 truncate">
+                              {w.label}
+                            </span>
+                            {w.badge && (
+                              <span className="shrink-0 rounded bg-purple-100/80 px-1 py-0.2 text-[8.5px] font-semibold text-purple-800">
+                                {w.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[9.5px] text-zinc-500 truncate mt-0.5">
+                            {w.description}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-zinc-400 group-hover:text-blue-500">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                          </svg>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
