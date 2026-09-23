@@ -89,6 +89,15 @@ export function ChartSettings({
     onChange({ ...config, values: values.length ? values : undefined });
   }
 
+  function patchSeriesLabel(index: number, label: string | undefined) {
+    const labels = [...(config.seriesLabels ?? graph.valueLabels ?? graph.seriesLabels ?? [])];
+    labels[index] = label;
+    while (labels.length && labels[labels.length - 1] === undefined) {
+      labels.pop();
+    }
+    onChange({ ...config, seriesLabels: labels.length ? labels : undefined });
+  }
+
   return (
     <div
       ref={rootRef}
@@ -217,24 +226,29 @@ export function ChartSettings({
           </div>
           <div className="grid grid-cols-2 gap-1 max-h-36 overflow-y-auto pr-0.5">
             {graph.valueLabels.map((valLabel, index) => {
+              const currentLabel =
+                config.seriesLabels?.[index] ?? valLabel;
               const currentVal =
                 config.values?.[index] ?? graph.defaultValues?.[index] ?? 0;
               const color = config.colors?.[index] ?? graph.defaultColors[index];
               return (
                 <div
-                  key={valLabel}
+                  key={index}
                   className="flex items-center justify-between gap-1 rounded bg-zinc-50/80 px-1 py-0.5 border border-zinc-100"
                 >
-                  <div className="flex items-center gap-1 min-w-0">
+                  <div className="flex items-center gap-1 min-w-0 flex-1">
                     {color && (
                       <span
                         className="h-2 w-2 shrink-0 rounded-full"
                         style={{ backgroundColor: color }}
                       />
                     )}
-                    <span className="truncate text-[9px] font-medium text-zinc-600">
-                      {valLabel}
-                    </span>
+                    <input
+                      type="text"
+                      value={currentLabel}
+                      onChange={(e) => patchSeriesLabel(index, e.target.value)}
+                      className="h-4 w-full min-w-0 bg-transparent text-[9px] font-medium text-zinc-700 outline-none focus:border-b focus:border-blue-500"
+                    />
                   </div>
                   <input
                     type="number"
@@ -243,7 +257,7 @@ export function ChartSettings({
                       const num = Number(e.target.value);
                       patchValue(index, Number.isFinite(num) ? num : undefined);
                     }}
-                    className="h-4 w-9 rounded border border-zinc-200 bg-white px-0.5 text-center text-[9px] font-medium text-zinc-800 outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="h-4 w-9 shrink-0 rounded border border-zinc-200 bg-white px-0.5 text-center text-[9px] font-medium text-zinc-800 outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                 </div>
               );

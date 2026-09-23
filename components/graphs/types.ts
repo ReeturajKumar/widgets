@@ -16,6 +16,8 @@ export interface ChartOverride {
   colors?: (string | undefined)[];
   /** Custom data values for slices / data points. */
   values?: (number | undefined)[];
+  /** Custom series / category names. */
+  seriesLabels?: (string | undefined)[];
 }
 
 export interface ChartProps {

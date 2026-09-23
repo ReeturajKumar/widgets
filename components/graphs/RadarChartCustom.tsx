@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/card";
 import {
   ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
 import type { ChartProps } from "./types";
@@ -58,14 +60,23 @@ export function RadarChartCustom({ config, className = "" }: ChartProps) {
     config?.values?.[5] ?? 90,
   ], [config?.values]);
 
+  const subsystems = useMemo(() => [
+    config?.seriesLabels?.[0] ?? "Turbine",
+    config?.seriesLabels?.[1] ?? "Generator",
+    config?.seriesLabels?.[2] ?? "Cooling",
+    config?.seriesLabels?.[3] ?? "Boiler",
+    config?.seriesLabels?.[4] ?? "Inverter",
+    config?.seriesLabels?.[5] ?? "Grid",
+  ], [config?.seriesLabels]);
+
   const chartData = useMemo(() => [
-    { subsystem: "Turbine", efficiency: values[0] },
-    { subsystem: "Generator", efficiency: values[1] },
-    { subsystem: "Cooling", efficiency: values[2] },
-    { subsystem: "Boiler", efficiency: values[3] },
-    { subsystem: "Inverter", efficiency: values[4] },
-    { subsystem: "Grid", efficiency: values[5] },
-  ], [values]);
+    { subsystem: subsystems[0], efficiency: values[0] },
+    { subsystem: subsystems[1], efficiency: values[1] },
+    { subsystem: subsystems[2], efficiency: values[2] },
+    { subsystem: subsystems[3], efficiency: values[3] },
+    { subsystem: subsystems[4], efficiency: values[4] },
+    { subsystem: subsystems[5], efficiency: values[5] },
+  ], [subsystems, values]);
 
   const chartConfig = useMemo(() => ({
     efficiency: {
@@ -114,10 +125,33 @@ export function RadarChartCustom({ config, className = "" }: ChartProps) {
             }}
             style={{ outline: "none" }}
           >
+            <ChartTooltip content={<ChartTooltipContent nameKey="subsystem" />} />
             <PolarGrid stroke="#e5e7eb" strokeDasharray="2 2" />
             <PolarAngleAxis
               dataKey="subsystem"
-              tick={{ fill: "#6b7280", fontSize: scale.axis, fontWeight: 500 }}
+              tick={(props: any) => {
+                const item = chartData.find((d) => d.subsystem === props.payload.value);
+                const val = item ? `${item.efficiency}%` : "";
+                return (
+                  <text
+                    x={props.x}
+                    y={props.y}
+                    textAnchor={props.textAnchor}
+                    dominantBaseline={props.dominantBaseline}
+                    fontSize={scale.axis}
+                    className="select-none pointer-events-none"
+                  >
+                    <tspan fontWeight={600} fill="#1f2937">
+                      {props.payload.value}
+                    </tspan>
+                    {val && (
+                      <tspan fontWeight={500} fill="#6b7280" dx="2">
+                        ({val})
+                      </tspan>
+                    )}
+                  </text>
+                );
+              }}
             />
             <Radar
               name="Efficiency"
