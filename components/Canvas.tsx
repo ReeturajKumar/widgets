@@ -154,9 +154,10 @@ function styleFor(edgeStyle: EdgeStyle) {
 interface CanvasInnerProps {
   onRegisterAdd: (fn: (icon: IconDef) => void) => void;
   onRegisterPlaceDashboard?: (fn: () => void) => void;
+  onModalDrop?: (id: string) => void;
 }
 
-function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerProps) {
+function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard, onModalDrop }: CanvasInnerProps) {
   const [initial] = useState(() => ({
     board: loadBoard(),
     edgeStyle: loadEdgeStyle() ?? ("bezier" as EdgeStyle),
@@ -438,6 +439,14 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
       });
 
       // 1. Full Dashboard template drop
+      // A modal is an overlay, not a canvas node — a drop just opens it,
+      // matching what clicking its tile does.
+      const droppedModal = event.dataTransfer.getData("application/x-widget-modal");
+      if (droppedModal) {
+        onModalDrop?.(droppedModal);
+        return;
+      }
+
       const dashboardTemplate = event.dataTransfer.getData("application/x-widget-dashboard");
       if (dashboardTemplate) {
         const templateId = (dashboardTemplate === "outage" ? "outage" : "soe") as "soe" | "outage";
@@ -566,7 +575,7 @@ function CanvasInner({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasInnerPro
         }
       }
     },
-    [screenToFlowPosition, setNodes]
+    [screenToFlowPosition, setNodes, onModalDrop]
   );
 
   function handleClearBoard() {
@@ -684,12 +693,18 @@ interface CanvasProps {
   onRegisterAdd: (fn: (icon: IconDef) => void) => void;
   /** Register a callback the parent can invoke to place a dashboard at the canvas centre. */
   onRegisterPlaceDashboard?: (fn: () => void) => void;
+  /** Fired when a modal tile is dropped on the canvas. */
+  onModalDrop?: (id: string) => void;
 }
 
-export function Canvas({ onRegisterAdd, onRegisterPlaceDashboard }: CanvasProps) {
+export function Canvas({ onRegisterAdd, onRegisterPlaceDashboard, onModalDrop }: CanvasProps) {
   return (
     <ReactFlowProvider>
-      <CanvasInner onRegisterAdd={onRegisterAdd} onRegisterPlaceDashboard={onRegisterPlaceDashboard} />
+      <CanvasInner
+        onRegisterAdd={onRegisterAdd}
+        onRegisterPlaceDashboard={onRegisterPlaceDashboard}
+        onModalDrop={onModalDrop}
+      />
     </ReactFlowProvider>
   );
 }

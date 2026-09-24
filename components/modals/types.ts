@@ -114,6 +114,12 @@ export interface ModalConfig {
   showClose: boolean;
   /** Soft decorative wave across the foot of the card. */
   showBottomWave: boolean;
+  /**
+   * Frosted-glass card: a translucent fill that blurs whatever sits behind it,
+   * instead of the flat `cardColor`. Reads best with the backdrop dim turned
+   * down, so some of the page shows through to be refracted.
+   */
+  glassCard: boolean;
 
   // ── Backdrop ──
   dimBackdrop: boolean;
@@ -167,6 +173,7 @@ export const SUCCESS_SIMPLE: ModalConfig = {
   showBottomWave: false,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 /** 2 — document illustration, "View Details" action. */
@@ -192,6 +199,7 @@ export const SUBMITTED_DOCUMENT: ModalConfig = {
   showBottomWave: false,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 /** 3 — ringed badge with two side-by-side actions. */
@@ -223,6 +231,7 @@ export const SUCCESS_TWO_ACTIONS: ModalConfig = {
   showBottomWave: false,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 /** 4 — gift-box illustration with a decorative wave at the card foot. */
@@ -248,6 +257,7 @@ export const GREAT_GIFTBOX: ModalConfig = {
   showBottomWave: true,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 /** 5 — three-step progress row above the copy. */
@@ -275,6 +285,7 @@ export const ALL_DONE_STEPS: ModalConfig = {
   showBottomWave: false,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 /** 6 — redesigned account-blocked warning, same light language. */
@@ -299,6 +310,7 @@ export const BLOCKED_MODAL: ModalConfig = {
   showBottomWave: false,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 /** 7 — redesigned submit-for-review confirmation. */
@@ -326,6 +338,7 @@ export const SUBMISSION_MODAL: ModalConfig = {
   showBottomWave: false,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 /** Blank starting point for a brand-new modal. */
@@ -349,6 +362,7 @@ export const EMPTY_MODAL: ModalConfig = {
   showBottomWave: false,
   dimBackdrop: true,
   blurBackdrop: true,
+  glassCard: false,
 };
 
 // ── Colour helper ────────────────────────────────────────────────────

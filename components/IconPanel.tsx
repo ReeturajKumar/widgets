@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from "react";
 
 // The sidebar groups its content into tabs. Components holds the widget
 // library; General is a slot for later — a future set of primitives (labels,
@@ -193,6 +193,8 @@ interface IconPanelProps {
   onTabChange?: (tab: SidebarTab) => void;
   /** Fired when the user clicks or drops a Dashboard template tile. */
   onOpenDashboard?: (templateId?: "soe" | "outage") => void;
+  /** Register the modal opener so a drop on the canvas can call it. */
+  onRegisterOpenModal?: (fn: (id: string) => void) => void;
 }
 
 /** Default open width, and the bounds a drag may resize between. */
@@ -215,6 +217,7 @@ export function IconPanel({
   onClickIcon,
   onTabChange,
   onOpenDashboard,
+  onRegisterOpenModal,
 }: IconPanelProps) {
   const [resizing, setResizing] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("components");
@@ -259,6 +262,12 @@ export function IconPanel({
     setResizing(false);
     onResizingChange?.(false);
   }, [onResizingChange]);
+  // The modal tiles live here but a drop lands on the Canvas, so hand the
+  // opener up for the drop handler to call.
+  useEffect(() => {
+    onRegisterOpenModal?.((id) => setOpenModal(id as ModalId));
+  }, [onRegisterOpenModal]);
+
   function handleDragStart(event: DragEvent<HTMLDivElement>, icon: IconDef) {
     const payload = JSON.stringify({ type: "icon", ...icon });
     event.dataTransfer.setData("application/x-widget-icon", JSON.stringify(icon));
@@ -873,15 +882,23 @@ export function IconPanel({
           {activeTab === "modals" && (
             <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-2">
               <p className="mb-2 px-1 text-[10px] text-zinc-400">
-                Click a preview to open the popup
+                Click to open · or drag onto the board
               </p>
               <div className="flex flex-col gap-2">
                 {MODAL_TILES.map((tile) => (
                   <button
                     key={tile.id}
                     type="button"
+                    draggable
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData(
+                        "application/x-widget-modal",
+                        tile.id
+                      );
+                      event.dataTransfer.effectAllowed = "copy";
+                    }}
                     onClick={() => setOpenModal(tile.id)}
-                    className="group flex items-center gap-2 rounded-md border border-zinc-200 bg-white p-2 text-left hover:border-blue-400 hover:bg-blue-50"
+                    className="group flex cursor-pointer items-center gap-2 rounded-md border border-zinc-200 bg-white p-2 text-left hover:border-blue-400 hover:bg-blue-50"
                   >
                     <span
                       className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tile.swatch}`}

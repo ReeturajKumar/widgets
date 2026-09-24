@@ -4,6 +4,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -184,6 +185,32 @@ export function EditableModal({
   // Flat fill — no gradient, so the card has no faded band at its foot.
   const cardBackground = config.cardColor ?? (dark ? "#1c1c1f" : "#ffffff");
 
+  // A clear pane has no colour of its own, so the content contrasts against
+  // whatever is BEHIND the card. A dimmed backdrop puts 60% black back there,
+  // which makes the pane read dark whatever the theme says — so text follows
+  // the backdrop in that case. `dark` still drives the solid-card fill;
+  // `darkSurface` drives everything readable that sits on top.
+  const darkSurface = config.glassCard ? dark || config.dimBackdrop : dark;
+
+  // Clear glass: barely any fill, so the pane carries no cast of its own and
+  // whatever sits behind simply shows through.
+  //
+  // The saturate() matters. Blur averages a busy region toward mid-grey, which
+  // is what made the pane look grey rather than clear — the fill was never the
+  // culprit. Boosting chroma puts back what the blur washes out, so the colours
+  // behind stay colours. The text halo carries legibility, so the blur does not
+  // have to be wide.
+  const GLASS_FILTER = "blur(14px) saturate(190%)";
+  const cardSurface: CSSProperties = config.glassCard
+    ? {
+        background: "rgba(255, 255, 255, 0.06)",
+        boxShadow: "0 8px 32px rgba(0, 0, 0, 0.18)",
+        backdropFilter: GLASS_FILTER,
+        WebkitBackdropFilter: GLASS_FILTER,
+        borderColor: "rgba(255, 255, 255, 0.25)",
+      }
+    : { backgroundColor: cardBackground };
+
   // A side-by-side button row divides the card width between its buttons, so
   // adding one would otherwise just make them all thinner. Widen the card to
   // whatever the row actually needs; the configured width stays the floor.
@@ -206,9 +233,7 @@ export function EditableModal({
       role="dialog"
       aria-modal="true"
       aria-label={config.title}
-      className={`fixed inset-0 z-[1000] flex items-center justify-center p-4 transition-opacity ${
-        config.dimBackdrop ? "bg-black/60" : "bg-transparent"
-      } ${config.blurBackdrop ? "backdrop-blur-sm" : ""}`}
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 transition-opacity"
       // Close only when the press AND the release both land on the backdrop
       // itself. Without the press check, drag-selecting text inside the card
       // and releasing past its edge would dismiss the modal mid-edit.
@@ -223,16 +248,34 @@ export function EditableModal({
       // Lift the centred card above the settings bar while it's open.
       style={panelOpen ? { paddingBottom: PANEL_LIFT } : undefined}
     >
+      {/* Dim and blur live on their own layer rather than on the backdrop
+          element. An element with backdrop-filter becomes a *backdrop root*,
+          and a descendant's own backdrop-filter can then only sample what is
+          painted inside it — so a glass card nested under a blurred backdrop
+          would have nothing to refract and would render flat. As a sibling
+          painted underneath, this still gets picked up by the card's glass.
+          pointer-events-none keeps backdrop-click-to-close working. */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 ${
+          config.dimBackdrop ? "bg-black/60" : ""
+        } ${config.blurBackdrop ? "backdrop-blur-sm" : ""}`}
+      />
+
       <div className="relative" onClick={(event) => event.stopPropagation()}>
         {/* ── The modal card ── */}
         <div
           style={{
             width: effectiveWidth,
             maxWidth: "90vw",
-            backgroundColor: cardBackground,
+            ...cardSurface,
           }}
           className={`relative overflow-hidden rounded-2xl border px-6 pb-6 pt-7 shadow-2xl shadow-black/25 ${
-            dark ? "border-white/10" : "border-black/10"
+            config.glassCard
+              ? ""
+              : darkSurface
+                ? "border-white/10"
+                : "border-black/10"
           }`}
         >
           {config.showBottomWave && <BottomWave color={config.badgeColor} />}
@@ -247,7 +290,7 @@ export function EditableModal({
               className={`absolute left-3.5 top-3.5 z-30 flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
                 panelOpen
                   ? "bg-blue-500 text-white"
-                  : dark
+                  : darkSurface
                     ? "text-zinc-500 hover:bg-white/10 hover:text-zinc-300"
                     : "text-zinc-400 hover:bg-black/5 hover:text-zinc-600"
               }`}
@@ -274,7 +317,7 @@ export function EditableModal({
               onClick={onClose}
               aria-label="Close"
               className={`absolute right-3.5 top-3.5 z-30 flex h-6 w-6 items-center justify-center rounded-full transition-colors ${
-                dark
+                darkSurface
                   ? "text-zinc-500 hover:bg-white/10 hover:text-zinc-300"
                   : "text-zinc-400 hover:bg-black/5 hover:text-zinc-600"
               }`}
@@ -294,7 +337,24 @@ export function EditableModal({
           )}
 
           {/* Content sits above the decorative wave */}
-          <div className="relative z-10 flex flex-col items-center text-center">
+          <div
+            className="relative z-10 flex flex-col items-center text-center"
+            style={
+              // Glass shows whatever is behind it, which the text has to stay
+              // legible against — a soft shadow separates the two. The pane
+              // recipe itself is untouched.
+              config.glassCard
+                ? {
+                    // A halo, not a drop shadow: a clear pane can put text
+                    // over anything, and a glow ringing the glyphs separates
+                    // them from the background whatever its luminance.
+                    textShadow: darkSurface
+                      ? "0 1px 3px rgba(0,0,0,0.65), 0 0 10px rgba(0,0,0,0.5)"
+                      : "0 1px 2px rgba(255,255,255,0.95), 0 0 10px rgba(255,255,255,0.85)",
+                  }
+                : undefined
+            }
+          >
             {/* Hero + its icon picker */}
             {config.showBadge && config.hero !== "none" && (
               <div className="relative w-full">
@@ -304,7 +364,7 @@ export function EditableModal({
                   color={config.badgeColor}
                   showRipples={config.showRipples}
                   decoration={config.decoration}
-                  dark={dark}
+                  dark={darkSurface}
                   editable={editable}
                   onIconClick={() => setIconPickerOpen((v) => !v)}
                   steps={config.steps}
@@ -313,7 +373,7 @@ export function EditableModal({
                       value={step.label}
                       onChange={(v) => patchStep(step.id, { label: v || "Step" })}
                       editable={editable}
-                      dark={dark}
+                      dark={darkSurface}
                     />
                   )}
                   onToggleStepDone={(id) => {
@@ -357,28 +417,28 @@ export function EditableModal({
             {/* Title */}
             <h2
               className={`${titleClass} font-bold tracking-tight ${
-                dark ? "text-white" : "text-zinc-900"
+                darkSurface ? "text-white" : "text-zinc-900"
               }`}
             >
               <Editable
                 value={config.title}
                 onChange={(v) => patch("title", v || "Title")}
                 editable={editable}
-                dark={dark}
+                dark={darkSurface}
               />
             </h2>
 
             {/* Message */}
             <div
               className={`mt-1.5 w-full max-w-[280px] text-[13px] leading-relaxed ${
-                dark ? "text-zinc-400" : "text-zinc-500"
+                darkSurface ? "text-zinc-200" : "text-zinc-700"
               }`}
             >
               <Editable
                 value={config.message}
                 onChange={(v) => patch("message", v)}
                 editable={editable}
-                dark={dark}
+                dark={darkSurface}
                 placeholder="Message"
                 multiline
               />
@@ -424,7 +484,7 @@ export function EditableModal({
                         // text, so its editor needs the dark treatment even on
                         // a light card — the light one is a white field, which
                         // would put white text on a white background.
-                        dark={button.variant === "solid" ? true : dark}
+                        dark={button.variant === "solid" ? true : darkSurface}
                       />
                     </button>
                     {editable && (
@@ -449,7 +509,7 @@ export function EditableModal({
                     className={`${buttonRadius} border border-dashed px-3 py-2.5 text-[11px] font-medium transition-colors ${
                       config.stackButtons ? "w-full" : "shrink-0"
                     } ${
-                      dark
+                      darkSurface
                         ? "border-white/25 text-zinc-400 hover:border-white/60 hover:text-white"
                         : "border-black/20 text-zinc-500 hover:border-blue-500 hover:text-blue-600"
                     }`}
@@ -675,6 +735,11 @@ function SettingsPanel({ config, patch, onReset, onClose }: SettingsPanelProps) 
             label="Blur backdrop"
             checked={config.blurBackdrop}
             onChange={(v) => patch("blurBackdrop", v)}
+          />
+          <Toggle
+            label="Glass card"
+            checked={config.glassCard}
+            onChange={(v) => patch("glassCard", v)}
           />
         </div>
       </div>

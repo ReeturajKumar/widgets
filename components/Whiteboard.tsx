@@ -36,6 +36,10 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
 
   const [resizing, setResizing] = useState(false);
   const placeDashboardRef = useRef<((templateId?: "soe" | "outage") => void) | null>(null);
+  const openModalRef = useRef<((id: string) => void) | null>(null);
+  const handleRegisterOpenModal = useCallback((fn: (id: string) => void) => {
+    openModalRef.current = fn;
+  }, []);
   const handleRegisterPlaceDashboard = useCallback((fn: (templateId?: "soe" | "outage") => void) => {
     placeDashboardRef.current = fn;
   }, []);
@@ -79,6 +83,7 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
         onResizingChange={setResizing}
         onClickIcon={handleClickIcon}
         onOpenDashboard={(templateId) => placeDashboardRef.current?.(templateId)}
+        onRegisterOpenModal={handleRegisterOpenModal}
       />
       <div
         className={`flex min-h-0 min-w-0 flex-1 flex-col ${
@@ -91,6 +96,7 @@ export function Whiteboard({ builtinIcons }: { builtinIcons: IconDef[] }) {
         <Canvas
           onRegisterAdd={handleRegisterAdd}
           onRegisterPlaceDashboard={handleRegisterPlaceDashboard}
+          onModalDrop={(id) => openModalRef.current?.(id)}
         />
       </div>
     </div>
