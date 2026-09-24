@@ -324,7 +324,7 @@ function EditableCell({
   const committed = useRef(false);
 
   useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
-  useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select(); } }, [editing]);
+  useEffect(() => { if (editing) { inputRef.current?.focus(); const caret = inputRef.current; if (caret) caret.setSelectionRange(caret.value.length, caret.value.length); } }, [editing]);
 
   function startEdit(e: React.MouseEvent) {
     if (!editable || e.detail < 2) return;
@@ -391,7 +391,7 @@ function EditableInline({
   const editing = session !== null;
 
   useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
-  useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select(); } }, [editing]);
+  useEffect(() => { if (editing) { inputRef.current?.focus(); const caret = inputRef.current; if (caret) caret.setSelectionRange(caret.value.length, caret.value.length); } }, [editing]);
 
   if (!editable) return <>{value}</>;
 

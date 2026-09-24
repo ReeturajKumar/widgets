@@ -8,42 +8,120 @@ import { useCallback, useRef, useState, type DragEvent, type PointerEvent as Rea
 export type SidebarTab = "components" | "general" | "modals" | "graphs" | "dashboard";
 
 // Popup modal previews shown in the Modals tab. Each entry is a tile that
-// opens its own modal; adding a new modal here means one row and one component.
-type ModalId = "success" | "submission" | "blocked";
+// opens its own modal; adding a new modal means one row here plus a preset in
+// components/modals/types.ts.
+type ModalId =
+  | "success-simple"
+  | "submitted-doc"
+  | "success-two"
+  | "great-gift"
+  | "all-done"
+  | "blocked"
+  | "submission";
 
 interface ModalTile {
   id: ModalId;
   label: string;
   description: string;
+  /** Tailwind classes for the round glyph chip. */
   swatch: string;
   glyph: React.ReactNode;
 }
 
+const G = {
+  fill: "none" as const,
+  stroke: "currentColor" as const,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  viewBox: "0 0 24 24",
+  className: "h-5 w-5",
+};
+
 const CHECK_GLYPH = (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg {...G} strokeWidth="2.6">
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
-const SUBMISSION_GLYPH = (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 11l3 3L22 4" />
-    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+const DOC_GLYPH = (
+  <svg {...G} strokeWidth="2">
+    <path d="M6 3h9l4 4v14H6z" />
+    <path d="M15 3v4h4" />
+    <polyline points="9 13 11 15 15 11" />
+  </svg>
+);
+const TWO_ACTION_GLYPH = (
+  <svg {...G} strokeWidth="2">
+    <circle cx="12" cy="9" r="5" />
+    <polyline points="10 9 11.5 10.5 14 8" />
+    <rect x="3" y="17" width="7" height="4" rx="1.4" />
+    <rect x="14" y="17" width="7" height="4" rx="1.4" />
+  </svg>
+);
+const GIFT_GLYPH = (
+  <svg {...G} strokeWidth="2">
+    <rect x="4" y="9" width="16" height="12" rx="1.5" />
+    <line x1="4" y1="13" x2="20" y2="13" />
+    <line x1="12" y1="9" x2="12" y2="21" />
+    <path d="M8 9a2.2 2.2 0 1 1 1.6-3.7L12 9M16 9a2.2 2.2 0 1 0-1.6-3.7L12 9" />
+  </svg>
+);
+const STEPS_GLYPH = (
+  <svg {...G} strokeWidth="2">
+    <circle cx="5" cy="12" r="2.6" />
+    <circle cx="12" cy="12" r="2.6" />
+    <circle cx="19" cy="12" r="2.6" />
+    <line x1="7.6" y1="12" x2="9.4" y2="12" />
+    <line x1="14.6" y1="12" x2="16.4" y2="12" />
   </svg>
 );
 const BLOCKED_GLYPH = (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg {...G} strokeWidth="2.6">
     <line x1="18" y1="6" x2="6" y2="18" />
     <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+const SUBMISSION_GLYPH = (
+  <svg {...G} strokeWidth="2">
+    <path d="M9 11l3 3L22 4" />
+    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
   </svg>
 );
 
 const MODAL_TILES: ModalTile[] = [
   {
-    id: "success",
+    id: "success-simple",
     label: "Success",
-    description: "Positive-confirmation popup",
-    swatch: "bg-emerald-500 text-white",
+    description: "Check badge, single action",
+    swatch: "bg-green-500 text-white",
     glyph: CHECK_GLYPH,
+  },
+  {
+    id: "submitted-doc",
+    label: "Submitted",
+    description: "Document illustration",
+    swatch: "bg-green-600 text-white",
+    glyph: DOC_GLYPH,
+  },
+  {
+    id: "success-two",
+    label: "Success — two actions",
+    description: "Ringed badge, side-by-side buttons",
+    swatch: "bg-emerald-500 text-white",
+    glyph: TWO_ACTION_GLYPH,
+  },
+  {
+    id: "great-gift",
+    label: "Great!",
+    description: "Gift box with bottom wave",
+    swatch: "bg-teal-500 text-white",
+    glyph: GIFT_GLYPH,
+  },
+  {
+    id: "all-done",
+    label: "All Done",
+    description: "Three-step progress row",
+    swatch: "bg-green-700 text-white",
+    glyph: STEPS_GLYPH,
   },
   {
     id: "blocked",
@@ -56,9 +134,25 @@ const MODAL_TILES: ModalTile[] = [
     id: "submission",
     label: "Submission",
     description: "Confirm before submitting",
-    swatch: "bg-blue-100 text-blue-600",
+    swatch: "bg-blue-500 text-white",
     glyph: SUBMISSION_GLYPH,
   },
+];
+
+// Preset + storage key per tile. Separate keys keep each modal's edits
+// independent, so customising one never disturbs another.
+const MODAL_PRESETS: {
+  id: ModalId;
+  config: ModalConfig;
+  storageKey: string;
+}[] = [
+  { id: "success-simple", config: SUCCESS_SIMPLE, storageKey: "modal.successSimple.v1" },
+  { id: "submitted-doc", config: SUBMITTED_DOCUMENT, storageKey: "modal.submittedDoc.v1" },
+  { id: "success-two", config: SUCCESS_TWO_ACTIONS, storageKey: "modal.successTwo.v1" },
+  { id: "great-gift", config: GREAT_GIFTBOX, storageKey: "modal.greatGift.v1" },
+  { id: "all-done", config: ALL_DONE_STEPS, storageKey: "modal.allDone.v1" },
+  { id: "blocked", config: BLOCKED_MODAL, storageKey: "modal.blocked.v2" },
+  { id: "submission", config: SUBMISSION_MODAL, storageKey: "modal.submission.v2" },
 ];
 
 const TABS: { id: SidebarTab; label: string }[] = [
@@ -73,9 +167,17 @@ import { IconArt } from "./IconArt";
 import { GRAPHS } from "./graphs/registry";
 import { SHAPES } from "./shapes/registry";
 import { DASHBOARD_WIDGETS } from "./dashboard/widgetRegistry";
-import { SubmissionModal } from "./modals/SubmissionModal";
-import { SuccessModal } from "./modals/SuccessModal";
-import { BlockedModal } from "./modals/BlockedModal";
+import { EditableModal } from "./modals/EditableModal";
+import {
+  ALL_DONE_STEPS,
+  BLOCKED_MODAL,
+  GREAT_GIFTBOX,
+  SUBMISSION_MODAL,
+  SUBMITTED_DOCUMENT,
+  SUCCESS_SIMPLE,
+  SUCCESS_TWO_ACTIONS,
+  type ModalConfig,
+} from "./modals/types";
 
 interface IconPanelProps {
   icons: IconDef[];
@@ -822,18 +924,15 @@ export function IconPanel({
           ))}
         </div>
       )}
-      <SuccessModal
-        open={openModal === "success"}
-        onClose={() => setOpenModal(null)}
-      />
-      <BlockedModal
-        open={openModal === "blocked"}
-        onClose={() => setOpenModal(null)}
-      />
-      <SubmissionModal
-        open={openModal === "submission"}
-        onClose={() => setOpenModal(null)}
-      />
+      {MODAL_PRESETS.map(({ id, config, storageKey }) => (
+        <EditableModal
+          key={id}
+          open={openModal === id}
+          onClose={() => setOpenModal(null)}
+          defaultConfig={config}
+          storageKey={storageKey}
+        />
+      ))}
 
       {/* Drag handle on the right edge. Only while open — there is nothing to
           resize when the panel is collapsed to its icon strip. */}

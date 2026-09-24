@@ -427,7 +427,9 @@ function TextEditor({ initial, fontSize, onCommit, onCancel }: TextEditorProps) 
     const input = ref.current;
     if (!input) return;
     input.focus();
-    input.select();
+    // Caret at the end — select-all lets the first keystroke wipe the text.
+    const caret = input;
+    if (caret) caret.setSelectionRange(caret.value.length, caret.value.length);
   }, []);
 
   function commit() {

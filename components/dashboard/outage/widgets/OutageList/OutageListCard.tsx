@@ -482,7 +482,9 @@ function EditableCell({
   useEffect(() => {
     if (editing) {
       inputRef.current?.focus();
-      inputRef.current?.select();
+      // Caret at the end — select-all lets the first keystroke wipe the text.
+      const caret = inputRef.current;
+      if (caret) caret.setSelectionRange(caret.value.length, caret.value.length);
     }
   }, [editing]);
 
@@ -557,7 +559,9 @@ function Editable({
   useEffect(() => {
     if (editing) {
       inputRef.current?.focus();
-      inputRef.current?.select();
+      // Caret at the end — select-all lets the first keystroke wipe the text.
+      const caret = inputRef.current;
+      if (caret) caret.setSelectionRange(caret.value.length, caret.value.length);
     }
   }, [editing]);
 
