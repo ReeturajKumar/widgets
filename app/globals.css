@@ -34,3 +34,98 @@ body {
 .react-flow__edgelabel-renderer {
   z-index: 1001;
 }
+/* ── Table page transitions ───────────────────────────────────────────
+   Applied to each <tr> rather than to <tbody>: a table-row-group is an
+   unreliable transform target, while a table-row is not, and per-row
+   animation is what makes the staggered cascade possible.
+
+   Direction comes in as --tbl-dir (1 = forward, -1 = back) set on the
+   table, so Next and Previous sweep opposite ways without needing a
+   second set of keyframes. */
+
+@keyframes tbl-fade-out { from { opacity: 1 } to { opacity: 0 } }
+@keyframes tbl-fade-in { from { opacity: 0 } to { opacity: 1 } }
+
+@keyframes tbl-slide-out {
+  from { opacity: 1; transform: translateX(0) }
+  to { opacity: 0; transform: translateX(calc(var(--tbl-dir, 1) * -30px)) }
+}
+@keyframes tbl-slide-in {
+  from { opacity: 0; transform: translateX(calc(var(--tbl-dir, 1) * 30px)) }
+  to { opacity: 1; transform: translateX(0) }
+}
+
+@keyframes tbl-slideup-out {
+  from { opacity: 1; transform: translateY(0) }
+  to { opacity: 0; transform: translateY(calc(var(--tbl-dir, 1) * -18px)) }
+}
+@keyframes tbl-slideup-in {
+  from { opacity: 0; transform: translateY(calc(var(--tbl-dir, 1) * 18px)) }
+  to { opacity: 1; transform: translateY(0) }
+}
+
+@keyframes tbl-zoom-out {
+  from { opacity: 1; transform: scale(1) }
+  to { opacity: 0; transform: scale(0.955) }
+}
+@keyframes tbl-zoom-in {
+  from { opacity: 0; transform: scale(1.035) }
+  to { opacity: 1; transform: scale(1) }
+}
+
+@keyframes tbl-flip-out {
+  from { opacity: 1; transform: perspective(700px) rotateX(0) }
+  to { opacity: 0; transform: perspective(700px) rotateX(calc(var(--tbl-dir, 1) * -34deg)) }
+}
+@keyframes tbl-flip-in {
+  from { opacity: 0; transform: perspective(700px) rotateX(calc(var(--tbl-dir, 1) * 34deg)) }
+  to { opacity: 1; transform: perspective(700px) rotateX(0) }
+}
+
+@keyframes tbl-blur-out {
+  from { opacity: 1; filter: blur(0) }
+  to { opacity: 0; filter: blur(5px) }
+}
+@keyframes tbl-blur-in {
+  from { opacity: 0; filter: blur(5px) }
+  to { opacity: 1; filter: blur(0) }
+}
+
+@keyframes tbl-stagger-out {
+  from { opacity: 1; transform: translateY(0) }
+  to { opacity: 0; transform: translateY(-9px) }
+}
+@keyframes tbl-stagger-in {
+  from { opacity: 0; transform: translateY(12px) }
+  to { opacity: 1; transform: translateY(0) }
+}
+
+.tbl-anim {
+  animation-duration: var(--tbl-ms, 240ms);
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  /* both: hold the end frame, so rows do not flash back to full opacity
+     in the gap between the out phase ending and the swap committing. */
+  animation-fill-mode: both;
+}
+
+.tbl-out-fade { animation-name: tbl-fade-out }
+.tbl-in-fade { animation-name: tbl-fade-in }
+.tbl-out-slide { animation-name: tbl-slide-out }
+.tbl-in-slide { animation-name: tbl-slide-in }
+.tbl-out-slideUp { animation-name: tbl-slideup-out }
+.tbl-in-slideUp { animation-name: tbl-slideup-in }
+.tbl-out-zoom { animation-name: tbl-zoom-out }
+.tbl-in-zoom { animation-name: tbl-zoom-in }
+.tbl-out-flip { animation-name: tbl-flip-out }
+.tbl-in-flip { animation-name: tbl-flip-in }
+.tbl-out-blur { animation-name: tbl-blur-out }
+.tbl-in-blur { animation-name: tbl-blur-in }
+.tbl-out-stagger { animation-name: tbl-stagger-out }
+.tbl-in-stagger { animation-name: tbl-stagger-in }
+
+@media (prefers-reduced-motion: reduce) {
+  .tbl-anim {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
+}

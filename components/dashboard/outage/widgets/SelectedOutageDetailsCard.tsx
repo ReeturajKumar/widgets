@@ -8,10 +8,13 @@ export function SelectedOutageDetailsCard({
   defaultConfig = DEFAULT_SELECTED_OUTAGE_DETAILS,
   storageKey = "outage.selecteddetails.v1",
   editable = true,
+  derivedRows,
 }: {
   defaultConfig?: SelectedOutageDetailsConfig;
   storageKey?: string;
   editable?: boolean;
+  /** Rows rebuilt from the filtered outages by a dashboard template. */
+  derivedRows?: OutageDetailRow[];
 }) {
   const [config, setConfig] = useState<SelectedOutageDetailsConfig>(() => {
     if (typeof window === "undefined") return defaultConfig;
@@ -53,6 +56,8 @@ export function SelectedOutageDetailsCard({
     }));
   }
 
+  const displayRows = derivedRows ?? config.rows;
+
   return (
     <section className="overflow-visible rounded-lg border border-blue-200 bg-white shadow-xs">
       <header className="group/header relative flex items-center justify-between border-b border-blue-200 bg-blue-600 px-3 py-1.5 text-white">
@@ -84,7 +89,12 @@ export function SelectedOutageDetailsCard({
       </header>
 
       <div className="divide-y divide-blue-100/70 text-[11px]">
-        {config.rows.map((row) => (
+        {derivedRows && derivedRows.length === 0 && (
+          <p className="px-3 py-6 text-center text-[11px] text-zinc-400">
+            No outage matches the current filters.
+          </p>
+        )}
+        {displayRows.map((row) => (
           <div
             key={row.id}
             className="group/row relative flex items-center gap-2 px-3 py-1.5 transition-colors hover:bg-blue-50/40"

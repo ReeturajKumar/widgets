@@ -39,6 +39,11 @@ export interface KpiTileConfig {
   value: string;
   label: string;
   icon: KpiIconKind;
+  /**
+   * A custom image used instead of `icon` — an uploaded data URL or a remote
+   * image URL. When unset, the built-in `icon` kind renders as before.
+   */
+  iconImage?: string;
 }
 
 export interface SoeSummaryConfig {

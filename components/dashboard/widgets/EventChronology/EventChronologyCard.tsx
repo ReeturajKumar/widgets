@@ -7,6 +7,11 @@ import {
   type KeyboardEvent,
 } from "react";
 import {
+  FilterBar,
+  useRowFilter,
+  type FilterField,
+} from "../../filterShared";
+import {
   DEFAULT_EVENT_CHRONOLOGY,
   type EventChronologyConfig,
   type TimelineKind,
@@ -33,6 +38,16 @@ interface EventChronologyCardProps {
   onChange?: (config: EventChronologyConfig) => void;
   /** Callback fired when a timeline point is selected. */
   onSelectPoint?: (point: TimelinePointConfig) => void;
+  /** Set by a dashboard template driving filtering from its filter panel. */
+  externalFilter?: (point: TimelinePointConfig) => boolean;
+  /**
+   * Timeline points rebuilt from the filtered events. Takes precedence over
+   * the card's own points so the timeline describes the same event set as the
+   * rest of the dashboard.
+   */
+  derivedPoints?: TimelinePointConfig[];
+  /** Hides the widget's own filter bar — see SoeEventList. */
+  hideFilterBar?: boolean;
 }
 
 /**
@@ -44,12 +59,26 @@ interface EventChronologyCardProps {
  * - Header '+ Point' button adds new timeline events.
  * - Full localStorage persistence.
  */
+
+// ── Filtering ─────────────────────────────────────────────────────────
+
+const FILTER_FIELDS: FilterField<TimelinePointConfig>[] = [
+  { key: "kind", label: "Severities", value: (p) => p.kind },
+];
+
+function searchableText(p: TimelinePointConfig): string {
+  return `${p.time} ${p.label} ${p.kind}`;
+}
+
 export function EventChronologyCard({
   defaultConfig = DEFAULT_EVENT_CHRONOLOGY,
   storageKey = "widget.chronology.v1",
   editable = true,
   onChange,
   onSelectPoint,
+  externalFilter,
+  derivedPoints,
+  hideFilterBar = false,
 }: EventChronologyCardProps) {
   const [config, setConfig] = useState<EventChronologyConfig>(() =>
     loadConfig(storageKey, defaultConfig)
@@ -64,6 +93,13 @@ export function EventChronologyCard({
     onChange?.(config);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config, storageKey]);
+
+  const filter = useRowFilter(config.points, FILTER_FIELDS, searchableText);
+  const visiblePoints = derivedPoints
+    ? derivedPoints
+    : externalFilter
+      ? config.points.filter(externalFilter)
+      : filter.rows;
 
   function patch<K extends keyof EventChronologyConfig>(
     key: K,
@@ -263,12 +299,21 @@ export function EventChronologyCard({
         </div>
       </header>
 
+      {!hideFilterBar && !externalFilter && (
+        <FilterBar
+          filter={filter}
+          fields={FILTER_FIELDS}
+          placeholder="Search events…"
+          noun="points"
+        />
+      )}
+
       {/* ── Body: Timeline Visualization ── */}
       <div className="p-3">
         <div className="overflow-x-auto pt-4 pb-1">
           {/* Top Labels Row */}
           <div className="mb-2 flex items-end justify-between gap-1 text-[9.5px]">
-            {config.points.map((point) => (
+            {visiblePoints.map((point) => (
               <div
                 key={point.id}
                 className="group/pt relative flex flex-1 flex-col items-center text-center"
@@ -380,7 +425,7 @@ export function EventChronologyCard({
 
             {/* Nodes across track */}
             <div className="relative flex w-full items-center justify-between">
-              {config.points.map((point, i) => (
+              {visiblePoints.map((point, i) => (
                 <div
                   key={point.id}
                   className="relative flex items-center justify-center"

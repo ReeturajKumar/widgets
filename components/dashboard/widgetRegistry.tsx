@@ -26,6 +26,12 @@ import { DEFAULT_EVENT_FILTERS } from "./widgets/EventFilters/types";
 import { SelectedEventDetailsCard } from "./widgets/SelectedEventDetails/SelectedEventDetailsCard";
 import { DEFAULT_SELECTED_EVENT_DETAILS } from "./widgets/SelectedEventDetails/types";
 
+// Time-series table
+import { ScadaTableCard } from "./widgets/ScadaTable/ScadaTableCard";
+import { DEFAULT_SCADA_TABLE } from "./widgets/ScadaTable/types";
+import { PssCommTableCard } from "./widgets/PssCommTable/PssCommTableCard";
+import { DEFAULT_PSS_COMM } from "./widgets/PssCommTable/types";
+
 // Common Header & Navbar widgets
 import { NavBar } from "./widgets/NavBar/NavBar";
 import { PageHeader as PageHeaderWidget } from "./widgets/PageHeader/PageHeader";
@@ -64,7 +70,11 @@ const COMMON_NAVBAR: NavBarConfig = {
 export interface DashboardWidgetEntry {
   key: string;
   label: string;
-  category: "Outage Monitoring" | "Sequence of Events (SOE)" | "Headers & Navigation";
+  category:
+    | "Outage Monitoring"
+    | "Sequence of Events (SOE)"
+    | "Headers & Navigation"
+    | "Time Series";
   description: string;
   badge?: string;
   defaultSize: { width: number; height: number };
@@ -273,6 +283,38 @@ export const DASHBOARD_WIDGETS: readonly DashboardWidgetEntry[] = [
     Component: ({ storageKey = "dashboard.pageheader.standalone", editable = true }) => (
       <PageHeaderWidget
         defaultConfig={COMMON_PAGE_HEADER}
+        storageKey={storageKey}
+        editable={editable}
+      />
+    ),
+  },
+  {
+    key: "scada-table",
+    label: "SCADA Data Table",
+    category: "Time Series",
+    description:
+      "Resizable time-series table — draggable columns, editable headers, date & interval driven",
+    badge: "Table",
+    defaultSize: { width: 1000, height: 420 },
+    Component: ({ storageKey = "widget.scadatable.standalone", editable = true }) => (
+      <ScadaTableCard
+        defaultConfig={DEFAULT_SCADA_TABLE}
+        storageKey={storageKey}
+        editable={editable}
+      />
+    ),
+  },
+  {
+    key: "pss-comm-table",
+    label: "PSS Communication Status",
+    category: "Time Series",
+    description:
+      "Live link viewer — RTU connection, IEC-104, latency & data quality badges",
+    badge: "Table",
+    defaultSize: { width: 1300, height: 420 },
+    Component: ({ storageKey = "widget.psscomm.standalone", editable = true }) => (
+      <PssCommTableCard
+        defaultConfig={DEFAULT_PSS_COMM}
         storageKey={storageKey}
         editable={editable}
       />

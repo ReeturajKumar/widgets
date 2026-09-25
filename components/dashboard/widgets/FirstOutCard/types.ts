@@ -34,6 +34,11 @@ export interface FirstOutStepConfig {
   timestamp: string;
   note: string;
   icon: FirstOutIconKind;
+  /**
+   * A custom image used instead of `icon` — an uploaded data URL or a remote
+   * image URL. When unset, the built-in `icon` kind renders as before.
+   */
+  iconImage?: string;
   /** If true this step renders with the red "initiating event" badge. */
   initiating?: boolean;
 }

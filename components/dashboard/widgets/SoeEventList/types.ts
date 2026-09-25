@@ -4,6 +4,8 @@
 // here so it round-trips through localStorage and the parent can seed it with
 // any data it wants.
 
+import type { TransitionStyle } from "../tableShared";
+
 export type EventPriority = "CRITICAL" | "WARNING" | "INFO";
 
 export interface SoeColumnConfig {
@@ -36,6 +38,23 @@ export interface SoeEventListConfig {
   subtitle: string;
   columns: SoeColumnConfig[];
   rows: SoeRowConfig[];
+
+  // ── Presentation ──
+  // Defaults reproduce the table's original hard-coded styling exactly, so
+  // adding these changed nothing on screen until someone edits them.
+  headerBg: string;
+  headerText: string;
+  cellBg: string;
+  cellText: string;
+  borderColor: string;
+  stripeBg: string;
+  rowHeight: number;
+  fontSize: number;
+
+  // ── Paging ──
+  paginate: boolean;
+  pageSize: number;
+  transition: TransitionStyle;
 }
 
 export const DEFAULT_COLUMNS: SoeColumnConfig[] = [
@@ -56,6 +75,17 @@ export const DEFAULT_SOE_EVENT_LIST: SoeEventListConfig = {
   title: "SOE Event List",
   subtitle: "(Showing 1 - 12 of 12 events)",
   columns: DEFAULT_COLUMNS,
+  headerBg: "#eff6ff",
+  headerText: "#3f3f46",
+  cellBg: "#ffffff",
+  cellText: "#3f3f46",
+  borderColor: "#f4f4f5",
+  stripeBg: "",
+  rowHeight: 22,
+  fontSize: 10,
+  paginate: true,
+  pageSize: 10,
+  transition: "fade",
   rows: [
     { id: "r01", num: "1",  date: "09-Sep-2026", time: "14:20:51", msec: "123", pss: "PSS-084", equipment: "Bus-1",        event: "Earth Fault Start",      previousState: "—",                    newState: "Detected",     priority: "CRITICAL", quality: "Good",    qualityGood: true  },
     { id: "r02", num: "2",  date: "09-Sep-2026", time: "14:20:51", msec: "156", pss: "PSS-084", equipment: "Relay RLY-01", event: "Protection Operation",   previousState: "Normal",               newState: "Operate",      priority: "CRITICAL", quality: "Good",    qualityGood: true  },

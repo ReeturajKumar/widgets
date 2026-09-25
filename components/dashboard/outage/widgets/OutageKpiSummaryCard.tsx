@@ -1,5 +1,10 @@
 "use client";
 
+import { applyOutageKpis } from "../derive";
+import { useTileReorder } from "../../useTileReorder";
+import { IconImage, IconImageControls } from "../../iconImage";
+import { PickerPopover } from "../../PickerPopover";
+
 import {
   useEffect,
   useRef,
@@ -7,6 +12,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { OUTAGE_KPI_TILES } from "../data";
+import { OUTAGE_KPI_ICON_KINDS } from "../types";
 import type { OutageKpiTile } from "../types";
 
 interface OutageKpiSummaryProps {
@@ -14,6 +20,8 @@ interface OutageKpiSummaryProps {
   storageKey?: string;
   editable?: boolean;
   onChange?: (tiles: OutageKpiTile[]) => void;
+  /** Live tile values keyed by id, from a template that is filtering. */
+  derivedValues?: Record<string, string>;
 }
 
 export function OutageKpiSummaryCard({
@@ -21,6 +29,7 @@ export function OutageKpiSummaryCard({
   storageKey = "outage.kpisummary.v1",
   editable = true,
   onChange,
+  derivedValues,
 }: OutageKpiSummaryProps) {
   const [tiles, setTiles] = useState<OutageKpiTile[]>(() =>
     loadTiles(storageKey, defaultTiles)
@@ -69,19 +78,104 @@ export function OutageKpiSummaryCard({
     }
   }
 
+  // Only one picker is ever open, so a single id is enough — no need to split
+  // each tile into its own component for local state. Outside-click closing
+  // lives in PickerPopover, which owns the portaled element.
+  const [openPicker, setOpenPicker] = useState<string | null>(null);
+  const [iconAnchor, setIconAnchor] = useState<HTMLButtonElement | null>(null);
+
+  const reorder = useTileReorder(tiles, setTiles, editable);
+
+  const displayTiles = derivedValues
+    ? applyOutageKpis(tiles, derivedValues)
+    : tiles;
+
   return (
     <section className="group/summary relative rounded-lg border border-blue-200/90 bg-white shadow-xs">
       {/* KPI Tiles Container */}
-      <div className="grid grid-cols-2 divide-x divide-y sm:grid-cols-4 lg:grid-cols-8 divide-zinc-200/70">
-        {tiles.map((tile) => (
+      {/* One row whatever the tile count — a fixed 8-column grid pushed the
+          ninth tile onto a second line. See SoeSummaryCard. */}
+      <div className="flex flex-nowrap divide-x divide-zinc-200/70 overflow-x-auto">
+        {displayTiles.map((tile) => (
           <div
             key={tile.id}
-            className="group/tile relative flex flex-col justify-between p-2.5 transition-colors hover:bg-blue-50/20"
+            {...reorder.dropProps(tile.id)}
+            className={`group/tile relative flex min-w-[96px] flex-1 shrink flex-col justify-between p-2.5 transition-colors hover:bg-blue-50/20 ${
+              reorder.draggingId === tile.id ? "opacity-40" : ""
+            }`}
           >
             {/* Top Row: Icon + Value */}
             <div className="flex items-center gap-2">
-              <div className="shrink-0">
-                <OutageIconGlyph icon={tile.icon} />
+              <div className="relative shrink-0">
+                <button
+                  ref={openPicker === tile.id ? setIconAnchor : undefined}
+                  type="button"
+                  onClick={(e) => {
+                    // Ignore the second click of a double-click, matching the
+                    // SOE card's picker.
+                    if (!editable || e.detail > 1) return;
+                    setOpenPicker((id) => (id === tile.id ? null : tile.id));
+                  }}
+                  disabled={!editable}
+                  title={editable ? "Click to change icon" : undefined}
+                  className={
+                    editable
+                      ? "cursor-pointer rounded transition-colors hover:bg-zinc-100"
+                      : "cursor-default"
+                  }
+                >
+                  {tile.iconImage ? (
+                    <IconImage
+                      src={tile.iconImage}
+                      className="h-7 w-7"
+                      // A remote image can stop resolving later; fall back to
+                      // the glyph rather than showing a broken-image box.
+                      onError={() => patchTile(tile.id, { iconImage: undefined })}
+                    />
+                  ) : (
+                    <OutageIconGlyph icon={tile.icon} />
+                  )}
+                </button>
+
+                {openPicker === tile.id && (
+                  <PickerPopover
+                    anchor={iconAnchor}
+                    width={196}
+                    onClose={() => setOpenPicker(null)}
+                  >
+                    <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
+                      Choose icon
+                    </p>
+                    <div className="grid grid-cols-4 gap-1">
+                      {OUTAGE_KPI_ICON_KINDS.map((kind) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => {
+                            patchTile(tile.id, { icon: kind, iconImage: undefined });
+                            setOpenPicker(null);
+                          }}
+                          title={kind}
+                          className={`flex items-center justify-center rounded p-1 ${
+                            kind === tile.icon && !tile.iconImage
+                              ? "bg-blue-600 ring-2 ring-blue-400"
+                              : "hover:bg-zinc-100"
+                          }`}
+                        >
+                          <OutageIconGlyph icon={kind} mini />
+                        </button>
+                      ))}
+                    </div>
+
+                    <IconImageControls
+                      value={tile.iconImage}
+                      onChange={(image) =>
+                        patchTile(tile.id, { iconImage: image ?? undefined })
+                      }
+                      onDone={() => setOpenPicker(null)}
+                    />
+                  </PickerPopover>
+                )}
               </div>
               <div className="flex items-center gap-1 min-w-0">
                 <EditableBlock
@@ -130,21 +224,44 @@ export function OutageKpiSummaryCard({
               )}
             </div>
 
-            {/* Delete button (hover) */}
-            {editable && (
-              <button
-                type="button"
-                onClick={() => removeTile(tile.id)}
-                title="Remove metric tile"
-                aria-label="Remove metric tile"
-                className="absolute -left-1 -top-1 z-20 hidden h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 group-hover/tile:flex cursor-pointer"
-              >
-                <svg viewBox="0 0 16 16" className="h-2 w-2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="4" y1="4" x2="12" y2="12" />
-                  <line x1="12" y1="4" x2="4" y2="12" />
-                </svg>
-              </button>
-            )}
+            {/* Hover controls, grouped inside the tile's own bounds. At
+                -left-1 / -right-1 one tile's grip landed on exactly the same
+                pixels as the next tile's delete button, since adjacent tiles
+                share an edge. */}
+            {editable && (() => {
+              const grip = reorder.gripProps(tile.id);
+              return (
+                <span className="absolute right-0.5 top-0.5 z-20 hidden items-center gap-0.5 group-hover/tile:flex">
+                  <span
+                    {...grip}
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder tile"
+                    className={`${
+                      (grip.className as string) ?? ""
+                    } flex h-4 w-4 cursor-grab items-center justify-center rounded bg-white text-zinc-400 shadow ring-1 ring-zinc-200 hover:text-zinc-700 active:cursor-grabbing`}
+                  >
+                    <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="currentColor">
+                      <circle cx="6" cy="4" r="1.2" /><circle cx="10" cy="4" r="1.2" />
+                      <circle cx="6" cy="8" r="1.2" /><circle cx="10" cy="8" r="1.2" />
+                      <circle cx="6" cy="12" r="1.2" /><circle cx="10" cy="12" r="1.2" />
+                    </svg>
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => removeTile(tile.id)}
+                    title="Remove metric tile"
+                    aria-label="Remove metric tile"
+                    className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700"
+                  >
+                    <svg viewBox="0 0 16 16" className="h-2 w-2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="4" y1="4" x2="12" y2="12" />
+                      <line x1="12" y1="4" x2="4" y2="12" />
+                    </svg>
+                  </button>
+                </span>
+              );
+            })()}
           </div>
         ))}
       </div>
@@ -176,7 +293,28 @@ export function OutageKpiSummaryCard({
 
 // ── Outage Icon Glyphs ────────────────────────────────────────────────
 
-function OutageIconGlyph({ icon }: { icon: OutageKpiTile["icon"] }) {
+/**
+ * The picker grid needs a smaller version of each glyph. Rather than
+ * duplicating the size classes through all eight branches, the full-size
+ * glyph is rendered and scaled down in a fixed-size box.
+ */
+function OutageIconGlyph({
+  icon,
+  mini,
+}: {
+  icon: OutageKpiTile["icon"];
+  mini?: boolean;
+}) {
+  const glyph = <OutageIconGlyphBase icon={icon} />;
+  if (!mini) return glyph;
+  return (
+    <span className="flex h-5 w-5 items-center justify-center overflow-hidden">
+      <span className="origin-center scale-[0.66]">{glyph}</span>
+    </span>
+  );
+}
+
+function OutageIconGlyphBase({ icon }: { icon: OutageKpiTile["icon"] }) {
   switch (icon) {
     case "alert-red":
       return (

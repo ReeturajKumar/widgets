@@ -82,6 +82,29 @@ export function EventFiltersCard({
     onApply?.(config);
   }
 
+  /**
+   * Clears what the user *selected*, leaving what they *edited* alone.
+   *
+   * Each dropdown goes back to its own first option — the "All …" sentinel —
+   * rather than to a hard-coded string, so a renamed option still resets
+   * correctly. Labels and option lists are untouched; wiping those is what the
+   * separate "Reset card" action is for.
+   */
+  function handleResetSelections() {
+    setConfig((prev) => ({
+      ...prev,
+      pssValue: prev.pssOptions[0] ?? prev.pssValue,
+      equipmentValue: prev.equipmentOptions[0] ?? prev.equipmentValue,
+      eventTypeValue: prev.eventTypeOptions[0] ?? prev.eventTypeValue,
+      priorityValue: prev.priorityOptions[0] ?? prev.priorityValue,
+      qualityValue: prev.qualityOptions[0] ?? prev.qualityValue,
+      searchValue: "",
+      dateFromValue: defaultConfig.dateFromValue,
+      dateToValue: defaultConfig.dateToValue,
+    }));
+    onResetFilters?.();
+  }
+
   return (
     <section className="overflow-visible rounded-lg border border-blue-200 bg-white shadow-sm">
       {/* ── Header ── */}
@@ -303,10 +326,7 @@ export function EventFiltersCard({
           {/* Reset */}
           <button
             type="button"
-            onClick={() => {
-              patch("searchValue", "");
-              onResetFilters?.();
-            }}
+            onClick={handleResetSelections}
             className="flex items-center justify-center gap-1.5 rounded-md border border-blue-200 bg-blue-50/80 py-1.5 px-2 text-[11px] font-semibold text-blue-900 shadow-xs transition-colors hover:bg-blue-100 active:scale-[0.98]"
           >
             <svg

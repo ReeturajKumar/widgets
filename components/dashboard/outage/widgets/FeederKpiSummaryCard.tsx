@@ -36,10 +36,13 @@ export function FeederKpiSummaryCard({
   defaultConfig = DEFAULT_CONFIG,
   storageKey = "outage.feederkpi.v2",
   editable = true,
+  derivedRows,
 }: {
   defaultConfig?: FeederKpiCardConfig;
   storageKey?: string;
   editable?: boolean;
+  /** Rows rebuilt from the filtered outages by a dashboard template. */
+  derivedRows?: FeederKpiRow[];
 }) {
   const [config, setConfig] = useState<FeederKpiCardConfig>(() => {
     if (typeof window === "undefined") return defaultConfig;
@@ -113,6 +116,8 @@ export function FeederKpiSummaryCard({
   function resetToDefault() {
     setConfig(defaultConfig);
   }
+
+  const displayRows = derivedRows ?? config.rows;
 
   return (
     <section className="flex flex-col overflow-hidden rounded-lg border border-blue-200 bg-white shadow-xs">
@@ -202,7 +207,14 @@ export function FeederKpiSummaryCard({
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 text-zinc-800">
-            {config.rows.map((row, idx) => (
+            {derivedRows && derivedRows.length === 0 && (
+              <tr>
+                <td colSpan={12} className="py-5 text-center text-[11px] text-zinc-400">
+                  No outages match the current filters.
+                </td>
+              </tr>
+            )}
+            {displayRows.map((row, idx) => (
               <tr
                 key={row.id}
                 className="group/row hover:bg-blue-50/40 transition-colors whitespace-nowrap"

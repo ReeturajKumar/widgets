@@ -1,5 +1,7 @@
 "use client";
 
+import { IconImage, IconImageControls } from "../../iconImage";
+
 import {
   useEffect,
   useRef,
@@ -273,7 +275,17 @@ function NavButton({ item, editable, onChange, onRemove }: NavButtonProps) {
           title={editable ? "Change icon" : undefined}
           className={editable ? "cursor-pointer rounded p-0.5 hover:bg-white/15" : ""}
         >
-          <NavIconGlyph name={item.icon} className="h-5 w-5" />
+          {item.iconImage ? (
+            <IconImage
+              src={item.iconImage}
+              className="h-5 w-5"
+              // A remote image can stop resolving later; fall back to the
+              // glyph rather than showing a broken-image box.
+              onError={() => onChange({ iconImage: undefined })}
+            />
+          ) : (
+            <NavIconGlyph name={item.icon} className="h-5 w-5" />
+          )}
         </button>
         <Editable
           value={item.label}
@@ -327,12 +339,12 @@ function NavButton({ item, editable, onChange, onRemove }: NavButtonProps) {
                 key={icon}
                 type="button"
                 onClick={() => {
-                  onChange({ icon });
+                  onChange({ icon, iconImage: undefined });
                   setIconPickerOpen(false);
                 }}
                 title={icon}
                 className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
-                  icon === item.icon
+                  icon === item.icon && !item.iconImage
                     ? "bg-blue-600 text-white shadow-xs"
                     : "hover:bg-blue-50 text-zinc-700 hover:text-blue-600"
                 }`}
@@ -341,6 +353,12 @@ function NavButton({ item, editable, onChange, onRemove }: NavButtonProps) {
               </button>
             ))}
           </div>
+
+          <IconImageControls
+            value={item.iconImage}
+            onChange={(image) => onChange({ iconImage: image ?? undefined })}
+            onDone={() => setIconPickerOpen(false)}
+          />
         </div>
       )}
     </div>

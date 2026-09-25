@@ -42,6 +42,24 @@ export function OutageFiltersCard({
     setConfig((prev) => ({ ...prev, [key]: val }));
   }
 
+  /**
+   * Clears what the user selected, leaving edited labels and option lists
+   * alone — each dropdown returns to its own first option, the "All …"
+   * sentinel.
+   */
+  function handleResetSelections() {
+    setConfig((prev) => ({
+      ...prev,
+      pssValue: prev.pssOptions[0] ?? prev.pssValue,
+      feederValue: prev.feederOptions[0] ?? prev.feederValue,
+      statusValue: prev.statusOptions[0] ?? prev.statusValue,
+      tripCauseValue: prev.tripCauseOptions[0] ?? prev.tripCauseValue,
+      dateFromValue: defaultConfig.dateFromValue,
+      dateToValue: defaultConfig.dateToValue,
+    }));
+    onReset?.();
+  }
+
   return (
     <section className="overflow-visible rounded-lg border border-blue-200 bg-white shadow-xs">
       <header className="flex items-center justify-between border-b border-blue-200 bg-blue-600 px-3 py-1.5 text-white">
@@ -162,10 +180,7 @@ export function OutageFiltersCard({
 
           <button
             type="button"
-            onClick={() => {
-              setConfig(defaultConfig);
-              onReset?.();
-            }}
+            onClick={handleResetSelections}
             className="flex items-center justify-center gap-1 rounded-md border border-blue-200 bg-blue-50/70 py-1.5 px-3 text-[11px] font-semibold text-blue-900 shadow-xs hover:bg-blue-100 cursor-pointer"
           >
             <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

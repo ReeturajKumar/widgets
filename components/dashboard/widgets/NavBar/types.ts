@@ -11,6 +11,11 @@ export interface NavItemConfig {
   id: string;
   label: string;
   icon: NavIcon;
+  /**
+   * A custom image used instead of `icon` — an uploaded data URL or a remote
+   * image URL. When unset, the built-in `icon` kind renders as before.
+   */
+  iconImage?: string;
   /** Text shown in the red badge; empty string / undefined hides the badge. */
   badge?: string;
 }

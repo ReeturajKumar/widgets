@@ -3,21 +3,41 @@
 export type OutageStatus = "Active" | "Restored" | "Critical";
 export type BreakerStatus = "Tripped" | "Open" | "Closed";
 
+/** Named so the icon picker can offer the full set — it was previously an
+ *  inline union with no list to iterate. */
+export type OutageKpiIconKind =
+  | "alert-red"
+  | "check-green"
+  | "doc-blue"
+  | "clock-blue"
+  | "stopwatch-red"
+  | "calendar-blue"
+  | "bolt-orange"
+  | "breaker-blue";
+
+export const OUTAGE_KPI_ICON_KINDS: OutageKpiIconKind[] = [
+  "alert-red",
+  "check-green",
+  "doc-blue",
+  "clock-blue",
+  "stopwatch-red",
+  "calendar-blue",
+  "bolt-orange",
+  "breaker-blue",
+];
+
 export interface OutageKpiTile {
   id: string;
   label: string;
   value: string;
   subtext?: string;
   trend?: "up" | "down";
-  icon:
-    | "alert-red"
-    | "check-green"
-    | "doc-blue"
-    | "clock-blue"
-    | "stopwatch-red"
-    | "calendar-blue"
-    | "bolt-orange"
-    | "breaker-blue";
+  icon: OutageKpiIconKind;
+  /**
+   * A custom image used instead of `icon` — an uploaded data URL or a remote
+   * image URL. When unset, the built-in `icon` kind renders as before.
+   */
+  iconImage?: string;
   colorScheme: "red" | "green" | "blue" | "orange";
 }
 

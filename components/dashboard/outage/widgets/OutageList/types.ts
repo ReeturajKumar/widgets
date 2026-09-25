@@ -1,5 +1,7 @@
 // Config shape for the OutageList widget.
 
+import type { TransitionStyle } from "../../../widgets/tableShared";
+
 export type OutageStatus = "Active" | "Restored" | "Critical";
 export type BreakerStatus = "Tripped" | "Open" | "Closed";
 
@@ -29,6 +31,23 @@ export interface OutageListConfig {
   subtitle: string;
   columns: OutageColumnConfig[];
   rows: OutageRowConfig[];
+
+  // ── Presentation ──
+  // Defaults reproduce the table's original hard-coded styling, so adding
+  // these changed nothing on screen until someone edits them.
+  headerBg: string;
+  headerText: string;
+  cellBg: string;
+  cellText: string;
+  borderColor: string;
+  stripeBg: string;
+  rowHeight: number;
+  fontSize: number;
+
+  // ── Paging ──
+  paginate: boolean;
+  pageSize: number;
+  transition: TransitionStyle;
 }
 
 export const DEFAULT_OUTAGE_COLUMNS: OutageColumnConfig[] = [
@@ -49,6 +68,17 @@ export const DEFAULT_OUTAGE_LIST: OutageListConfig = {
   title: "Outage List / Active & Recent Outages",
   subtitle: "(Latest First)",
   columns: DEFAULT_OUTAGE_COLUMNS,
+  headerBg: "#eff6ff",
+  headerText: "#172554",
+  cellBg: "#ffffff",
+  cellText: "#27272a",
+  borderColor: "#e4e4e7",
+  stripeBg: "",
+  rowHeight: 24,
+  fontSize: 10.5,
+  paginate: true,
+  pageSize: 8,
+  transition: "fade",
   rows: [
     {
       id: "out-1",

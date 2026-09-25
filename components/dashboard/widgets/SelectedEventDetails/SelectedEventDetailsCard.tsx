@@ -1,5 +1,8 @@
 "use client";
 
+import { applyEventDetails } from "../EventFilters/derive";
+import type { SoeRowConfig } from "../SoeEventList/types";
+
 import {
   useEffect,
   useRef,
@@ -16,6 +19,14 @@ import {
 // ── Props ─────────────────────────────────────────────────────────────
 
 interface SelectedEventDetailsCardProps {
+  /**
+   * The event this card should describe, supplied by a dashboard template
+   * that is filtering:
+   *   undefined — not filtering, show the configured rows
+   *   null      — filtering, but nothing matched
+   *   a row     — fill every field the event carries
+   */
+  derivedEvent?: SoeRowConfig | null;
   /** Initial configuration; used on first render if nothing in storage. */
   defaultConfig?: SelectedEventDetailsConfig;
   /** Storage key for localStorage persistence. */
@@ -41,6 +52,7 @@ export function SelectedEventDetailsCard({
   storageKey = "widget.selecteddetails.v1",
   editable = true,
   onChange,
+  derivedEvent,
 }: SelectedEventDetailsCardProps) {
   const [config, setConfig] = useState<SelectedEventDetailsConfig>(() =>
     loadConfig(storageKey, defaultConfig)
@@ -116,6 +128,11 @@ export function SelectedEventDetailsCard({
     }
   }
 
+  const noMatch = derivedEvent === null;
+  const displayRows = derivedEvent
+    ? applyEventDetails(config.rows, derivedEvent)
+    : config.rows;
+
   return (
     <section className="overflow-visible rounded-lg border border-blue-200 bg-white shadow-sm">
       {/* ── Header ── */}
@@ -187,7 +204,12 @@ export function SelectedEventDetailsCard({
 
       {/* ── Body: Divided List Rows ── */}
       <div className="divide-y divide-blue-100/70 text-[11px]">
-        {config.rows.map((row) => (
+        {noMatch && (
+          <p className="px-3 py-6 text-center text-[11px] text-zinc-400">
+            No event matches the current filters.
+          </p>
+        )}
+        {!noMatch && displayRows.map((row) => (
           <div
             key={row.id}
             className="group/row relative flex items-start gap-2 px-3 py-1.5 transition-colors hover:bg-blue-50/40"

@@ -1,5 +1,7 @@
 "use client";
 
+import { IconImage, IconImageControls } from "../../iconImage";
+
 import {
   useEffect,
   useRef,
@@ -17,6 +19,8 @@ import {
 // ── Props ─────────────────────────────────────────────────────────────
 
 interface FirstOutCardProps {
+  /** Cascade steps derived from the filtered events by a dashboard template. */
+  derivedSteps?: FirstOutStepConfig[];
   /** Starting configuration; used on first render if nothing is in storage. */
   defaultConfig?: FirstOutConfig;
   /** Distinct key per instance for localStorage persistence. */
@@ -41,6 +45,7 @@ export function FirstOutCard({
   storageKey = "widget.firstout.v1",
   editable = true,
   onChange,
+  derivedSteps,
 }: FirstOutCardProps) {
   const [config, setConfig] = useState<FirstOutConfig>(() =>
     loadConfig(storageKey, defaultConfig)
@@ -121,6 +126,8 @@ export function FirstOutCard({
     }
   }
 
+  const displaySteps = derivedSteps ?? config.steps;
+
   return (
     <section className="overflow-visible rounded-lg border border-blue-200 bg-white">
       {/* ── Header ── */}
@@ -188,7 +195,12 @@ export function FirstOutCard({
       {/* ── Body: Sequence Steps ── */}
       <div className="bg-red-50/60 p-3">
         <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap overflow-x-auto pb-1">
-          {config.steps.map((step, i) => (
+          {derivedSteps && derivedSteps.length === 0 && (
+            <p className="w-full py-6 text-center text-[11px] text-zinc-400">
+              No events match the current filters.
+            </p>
+          )}
+          {displaySteps.map((step, i) => (
             <div key={step.id} className="flex flex-1 min-w-[155px] items-stretch">
               <StepCard
                 step={step}
@@ -347,7 +359,17 @@ function StepCard({
                 : "cursor-default"
             }
           >
-            <FirstOutIconGlyph kind={step.icon} />
+            {step.iconImage ? (
+              <IconImage
+                src={step.iconImage}
+                className="h-5 w-5"
+                // A remote image can stop resolving later; fall back to the
+                // glyph rather than showing a broken-image box.
+                onError={() => onChange({ iconImage: undefined })}
+              />
+            ) : (
+              <FirstOutIconGlyph kind={step.icon} />
+            )}
           </button>
 
           {/* Icon picker dropdown */}
@@ -366,12 +388,12 @@ function StepCard({
                     key={kind}
                     type="button"
                     onClick={() => {
-                      onChange({ icon: kind });
+                      onChange({ icon: kind, iconImage: undefined });
                       setPickerOpen(false);
                     }}
                     title={kind}
                     className={`flex items-center justify-center rounded p-1 transition-all ${
-                      kind === step.icon
+                      kind === step.icon && !step.iconImage
                         ? "bg-blue-600 ring-2 ring-blue-400"
                         : "hover:bg-zinc-100"
                     }`}
@@ -380,6 +402,12 @@ function StepCard({
                   </button>
                 ))}
               </div>
+
+              <IconImageControls
+                value={step.iconImage}
+                onChange={(image) => onChange({ iconImage: image ?? undefined })}
+                onDone={() => setPickerOpen(false)}
+              />
             </div>
           )}
         </div>

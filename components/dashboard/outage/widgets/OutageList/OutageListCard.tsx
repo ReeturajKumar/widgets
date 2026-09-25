@@ -4,8 +4,24 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
 } from "react";
+import {
+  Group,
+  NumberField,
+  PanelColumn,
+  SelectField,
+  SettingsShell,
+  Slider,
+  Swatch,
+  TablePager,
+  TRANSITION_MS,
+  TRANSITION_OPTIONS,
+  Toggle,
+  usePaging,
+  type TransitionStyle,
+} from "../../../widgets/tableShared";
 import {
   DEFAULT_OUTAGE_LIST,
   type BreakerStatus,
@@ -25,6 +41,12 @@ interface OutageListProps {
   onSelectRow?: (row: OutageRowConfig) => void;
   /** Callback fired whenever configuration changes. */
   onChange?: (config: OutageListConfig) => void;
+  /**
+   * Supplied when a dashboard template drives filtering from its filter panel.
+   * It composes with this card's own header search rather than replacing it,
+   * so both narrow the list together.
+   */
+  externalFilter?: (row: OutageRowConfig) => boolean;
 }
 
 /**
@@ -42,12 +64,14 @@ export function OutageListCard({
   editable = true,
   onSelectRow,
   onChange,
+  externalFilter,
 }: OutageListProps) {
   const [config, setConfig] = useState<OutageListConfig>(() =>
     loadConfig(storageKey, defaultConfig)
   );
   const [selectedId, setSelectedId] = useState<string>(config.rows[0]?.id || "");
   const [search, setSearch] = useState("");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -65,6 +89,8 @@ export function OutageListCard({
   const restoredCount = config.rows.filter((r) => r.status === "Restored").length;
 
   const filteredRows = config.rows.filter((r) => {
+    // The panel's filter and this card's search both have to pass.
+    if (externalFilter && !externalFilter(r)) return false;
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -75,6 +101,13 @@ export function OutageListCard({
       r.status.toLowerCase().includes(q)
     );
   });
+
+  const paging = usePaging(
+    filteredRows,
+    config.pageSize,
+    config.transition,
+    config.paginate
+  );
 
   function patch<K extends keyof OutageListConfig>(
     key: K,
@@ -168,7 +201,7 @@ export function OutageListCard({
   }
 
   return (
-    <section className="overflow-visible rounded-lg border border-blue-200 bg-white shadow-sm">
+    <section className="relative overflow-visible rounded-lg border border-blue-200 bg-white shadow-sm">
       {/* ── Header ── */}
       <header className="group/header relative flex flex-wrap items-center justify-between gap-2 border-b border-blue-200 bg-blue-600 px-3 py-1.5 text-white">
         <div className="flex items-center gap-2">
@@ -254,9 +287,26 @@ export function OutageListCard({
 
       {/* ── Compact Table Container ── */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-[10.5px] border-collapse">
+        <table
+          className="w-full border-collapse text-left"
+          style={
+            {
+              fontSize: config.fontSize,
+              color: config.cellText,
+              "--tbl-dir": paging.direction,
+              "--tbl-ms": `${TRANSITION_MS}ms`,
+            } as CSSProperties
+          }
+        >
           <thead>
-            <tr className="border-b border-blue-100 bg-blue-50/60 font-semibold text-blue-950 text-[10px] whitespace-nowrap">
+            <tr
+              className="whitespace-nowrap border-b font-semibold"
+              style={{
+                backgroundColor: config.headerBg,
+                color: config.headerText,
+                borderBottomColor: config.borderColor,
+              }}
+            >
               {config.columns.map((col) => (
                 <th
                   key={col.key}
@@ -280,10 +330,20 @@ export function OutageListCard({
                   )}
                 </th>
               ))}
+              {editable && (
+                <th
+                  className="sticky right-0 z-10 w-8 px-1 py-1.5"
+                  style={{
+                    backgroundColor: config.headerBg,
+                    borderLeft: `1px solid ${config.borderColor}`,
+                  }}
+                />
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200/50 text-zinc-800 whitespace-nowrap">
-            {filteredRows.map((row, idx) => {
+            {paging.pageRows.map((row, indexInPage) => {
+              const idx = paging.offset + indexInPage;
               const isSelected = row.id === selectedId;
               return (
                 <tr
@@ -292,38 +352,28 @@ export function OutageListCard({
                     setSelectedId(row.id);
                     onSelectRow?.(row);
                   }}
-                  className={`group/row cursor-pointer transition-colors whitespace-nowrap ${
-                    isSelected
-                      ? "bg-blue-50/80 font-medium"
-                      : idx % 2 === 0
-                      ? "bg-white hover:bg-zinc-50/80"
-                      : "bg-zinc-50/30 hover:bg-zinc-50/80"
-                  }`}
+                  className={`group/row cursor-pointer whitespace-nowrap transition-colors ${
+                    isSelected ? "bg-blue-50/80 font-medium" : "hover:bg-zinc-50/80"
+                  } ${paging.rowClass}`}
+                  style={{
+                    // The selected-row highlight keeps priority over the
+                    // configured background.
+                    backgroundColor: isSelected
+                      ? undefined
+                      : config.stripeBg && idx % 2 === 1
+                        ? config.stripeBg
+                        : config.cellBg,
+                    height: config.rowHeight,
+                    animationDelay: `${paging.rowDelay(indexInPage)}ms`,
+                  }}
                 >
                   {/* # Number */}
-                  <td className="py-1 px-2 text-center text-zinc-400 text-[9.5px] relative whitespace-nowrap">
+                  <td className="whitespace-nowrap px-2 py-1 text-center text-[9.5px] text-zinc-400">
                     <EditableCell
                       value={row.num || String(idx + 1)}
                       onChange={(v) => patchRow(row.id, { num: v })}
                       editable={editable}
                     />
-                    {editable && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeRow(row.id);
-                        }}
-                        title="Remove row"
-                        aria-label="Remove row"
-                        className="absolute -left-1 top-1 hidden h-3.5 w-3.5 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700 group-hover/row:flex cursor-pointer"
-                      >
-                        <svg viewBox="0 0 16 16" className="h-2 w-2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <line x1="4" y1="4" x2="12" y2="12" />
-                          <line x1="12" y1="4" x2="4" y2="12" />
-                        </svg>
-                      </button>
-                    )}
                   </td>
 
                   {/* PSS */}
@@ -439,14 +489,50 @@ export function OutageListCard({
                       {row.status}
                     </button>
                   </td>
+
+                  {/* Action column. A column of its own rather than floating
+                      over the # cell, and sticky so it stays reachable
+                      whatever the column count or content width. */}
+                  {editable && (
+                    <td
+                      className="sticky right-0 z-10 w-8 px-1 py-1 text-center"
+                      // Its own background, or the cells it floats over while
+                      // scrolling would show through underneath it. The left
+                      // divider makes it read as a pinned column.
+                      style={{
+                        backgroundColor: isSelected
+                          ? "#eff6ff"
+                          : config.stripeBg && idx % 2 === 1
+                            ? config.stripeBg
+                            : config.cellBg,
+                        borderLeft: `1px solid ${config.borderColor}`,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeRow(row.id);
+                        }}
+                        title="Remove row"
+                        aria-label="Remove row"
+                        className="mx-auto flex h-3.5 w-3.5 cursor-pointer items-center justify-center rounded-full bg-red-600 text-white opacity-0 shadow transition-opacity hover:bg-red-700 group-hover/row:opacity-100 focus-visible:opacity-100"
+                      >
+                        <svg viewBox="0 0 16 16" className="h-2 w-2" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                          <line x1="4" y1="4" x2="12" y2="12" />
+                          <line x1="12" y1="4" x2="4" y2="12" />
+                        </svg>
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
 
-            {filteredRows.length === 0 && (
+            {paging.pageRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={config.columns.length}
+                  colSpan={config.columns.length + (editable ? 1 : 0)}
                   className="py-4 text-center text-zinc-400 text-[10.5px]"
                 >
                   No outage records match your search.
@@ -456,6 +542,103 @@ export function OutageListCard({
           </tbody>
         </table>
       </div>
+
+      {config.paginate && (
+        <TablePager
+          paging={paging}
+          background={config.headerBg}
+          color={config.headerText}
+          borderColor={config.borderColor}
+        />
+      )}
+
+      {editable && (
+        <button
+          type="button"
+          onClick={() => setPanelOpen((v) => !v)}
+          title="Table settings"
+          aria-label="Table settings"
+          className={`nodrag nopan absolute bottom-2 right-2 z-20 flex h-6 w-6 items-center justify-center rounded-full shadow transition-colors ${
+            panelOpen ? "bg-blue-500 text-white" : "bg-white/90 text-zinc-600 hover:bg-white"
+          }`}
+        >
+          <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+          </svg>
+        </button>
+      )}
+
+      {editable && panelOpen && (
+        <SettingsShell
+          title="Table settings"
+          onReset={reset}
+          onClose={() => setPanelOpen(false)}
+          hint={
+            <>
+              Double-click any cell to edit it · click a row to select it ·
+              Previous / Next turn the page.
+            </>
+          }
+        >
+          <PanelColumn>
+            <Group label="Colours">
+              <Swatch label="Header bg" value={config.headerBg} onChange={(v) => patch("headerBg", v)} />
+              <Swatch label="Header text" value={config.headerText} onChange={(v) => patch("headerText", v)} />
+              <Swatch label="Cell bg" value={config.cellBg} onChange={(v) => patch("cellBg", v)} />
+              <Swatch label="Cell text" value={config.cellText} onChange={(v) => patch("cellText", v)} />
+              <Swatch label="Stripe" value={config.stripeBg} onChange={(v) => patch("stripeBg", v)} />
+              <Swatch label="Border" value={config.borderColor} onChange={(v) => patch("borderColor", v)} />
+            </Group>
+          </PanelColumn>
+
+          <PanelColumn>
+            <Group label="Size">
+              <Slider
+                label="Row height"
+                value={config.rowHeight}
+                suffix="px"
+                min={18}
+                max={56}
+                onChange={(v) => patch("rowHeight", v)}
+              />
+              <Slider
+                label="Font size"
+                value={config.fontSize}
+                suffix="px"
+                min={8}
+                max={18}
+                onChange={(v) => patch("fontSize", v)}
+              />
+            </Group>
+          </PanelColumn>
+
+          <PanelColumn>
+            <Group label="Paging">
+              <Toggle
+                label="Paginate rows"
+                checked={config.paginate}
+                onChange={(v) => patch("paginate", v)}
+              />
+              <NumberField
+                label="Rows per page"
+                value={config.pageSize}
+                min={1}
+                max={100}
+                disabled={!config.paginate}
+                onChange={(v) => patch("pageSize", v)}
+              />
+              <SelectField
+                label="Transition"
+                value={config.transition}
+                options={TRANSITION_OPTIONS}
+                disabled={!config.paginate}
+                onChange={(v) => patch("transition", v as TransitionStyle)}
+              />
+            </Group>
+          </PanelColumn>
+        </SettingsShell>
+      )}
     </section>
   );
 }

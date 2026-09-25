@@ -832,6 +832,62 @@ export function IconPanel({
                   })}
                 </div>
               </div>
+              {/* Time Series tables */}
+              <div>
+                <div className="flex items-center justify-between px-1 mb-1.5 border-t border-zinc-200/80 pt-2.5">
+                  <span className="text-[10.5px] font-bold tracking-tight text-blue-950 uppercase">
+                    Tables
+                  </span>
+                  <span className="text-[9px] font-medium text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded">
+                    2 Components
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {DASHBOARD_WIDGETS.filter((w) => w.category === "Time Series").map((w) => {
+                    const tile: IconDef = {
+                      id: `widget-${w.key}`,
+                      name: w.label,
+                      componentKey: w.key,
+                    };
+                    return (
+                      <div
+                        key={w.key}
+                        draggable
+                        onDragStart={(e) => handleDragWidget(e, w.key, tile)}
+                        onClick={() => onClickIcon(tile)}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => e.key === "Enter" && onClickIcon(tile)}
+                        className="group flex cursor-grab active:cursor-grabbing select-none items-center justify-between rounded-md border border-zinc-200 bg-white p-2 hover:border-blue-400 hover:bg-blue-50 active:scale-[0.98] transition-all"
+                      >
+                        <div className="min-w-0 flex-1 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-zinc-800 group-hover:text-blue-600 truncate">
+                              {w.label}
+                            </span>
+                            {w.badge && (
+                              <span className="shrink-0 rounded bg-purple-100/80 px-1 py-0.2 text-[8.5px] font-semibold text-purple-800">
+                                {w.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[9.5px] text-zinc-500 truncate mt-0.5">
+                            {w.description}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-zinc-400 group-hover:text-blue-500">
+                          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="16" />
+                            <line x1="8" y1="12" x2="16" y2="12" />
+                          </svg>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 

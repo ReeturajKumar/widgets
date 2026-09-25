@@ -1,5 +1,10 @@
 "use client";
 
+import { applySummaryValues } from "../EventFilters/derive";
+import { useTileReorder } from "../../useTileReorder";
+import { IconImage, IconImageControls } from "../../iconImage";
+import { PickerPopover } from "../../PickerPopover";
+
 import {
   useEffect,
   useRef,
@@ -17,6 +22,11 @@ import {
 // ── Props ─────────────────────────────────────────────────────────────
 
 interface SoeSummaryCardProps {
+  /**
+   * Live tile values keyed by tile id, supplied by a dashboard template that
+   * is filtering. A tile with no entry keeps its configured value.
+   */
+  derivedValues?: Record<string, string>;
   /** Starting configuration; used only on first render if nothing is in storage. */
   defaultConfig?: SoeSummaryConfig;
   /** Distinct key per instance — lets two cards on the same board keep separate state. */
@@ -41,6 +51,7 @@ export function SoeSummaryCard({
   storageKey = "widget.soesummary.v1",
   editable = true,
   onChange,
+  derivedValues,
 }: SoeSummaryCardProps) {
   const [config, setConfig] = useState<SoeSummaryConfig>(() =>
     loadConfig(storageKey, defaultConfig)
@@ -97,6 +108,16 @@ export function SoeSummaryCard({
     }
   }
 
+  const reorder = useTileReorder(
+    config.tiles,
+    (tiles) => patch("tiles", tiles),
+    editable
+  );
+
+  const displayTiles = derivedValues
+    ? applySummaryValues(config.tiles, derivedValues)
+    : config.tiles;
+
   return (
     <section className="overflow-visible rounded-lg border border-blue-200 bg-white">
       {/* ── Header ── */}
@@ -148,20 +169,26 @@ export function SoeSummaryCard({
         )}
       </header>
 
-      {/* ── KPI tile grid ── */}
-      <div className="flex flex-wrap gap-0 divide-x divide-zinc-100">
-        {config.tiles.map((tile) => (
+      {/* ── KPI tile row ──
+          One row whatever the tile count: flex-nowrap keeps added tiles on the
+          same line, and they share the width. Past the point where they would
+          be unreadable the row scrolls sideways instead of wrapping. */}
+      <div className="flex flex-nowrap gap-0 divide-x divide-zinc-100 overflow-x-auto">
+        {displayTiles.map((tile) => (
           <KpiTile
             key={tile.id}
             tile={tile}
             editable={editable}
             onChange={(changes) => patchTile(tile.id, changes)}
             onRemove={() => removeTile(tile.id)}
+            gripProps={reorder.gripProps(tile.id)}
+            dropProps={reorder.dropProps(tile.id)}
+            dragging={reorder.draggingId === tile.id}
           />
         ))}
 
         {config.tiles.length === 0 && (
-          <p className="px-4 py-6 text-center text-[11px] text-zinc-400 w-full">
+          <p className="w-full px-4 py-6 text-center text-[11px] text-zinc-400">
             No KPI tiles.{editable ? " Click + to add one." : ""}
           </p>
         )}
@@ -177,29 +204,36 @@ interface KpiTileProps {
   editable: boolean;
   onChange: (changes: Partial<KpiTileConfig>) => void;
   onRemove: () => void;
+  gripProps: Record<string, unknown>;
+  dropProps: Record<string, unknown>;
+  dragging: boolean;
 }
 
-function KpiTile({ tile, editable, onChange, onRemove }: KpiTileProps) {
+function KpiTile({
+  tile,
+  editable,
+  onChange,
+  onRemove,
+  gripProps,
+  dropProps,
+  dragging,
+}: KpiTileProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const [iconAnchor, setIconAnchor] = useState<HTMLButtonElement | null>(null);
 
-  // Close icon picker when clicking outside it
-  useEffect(() => {
-    if (!pickerOpen) return;
-    function onPointerDown(event: PointerEvent) {
-      if (!pickerRef.current?.contains(event.target as Node)) {
-        setPickerOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () =>
-      document.removeEventListener("pointerdown", onPointerDown, true);
-  }, [pickerOpen]);
+  // Outside-click closing lives in PickerPopover now — the popover is portaled,
+  // so a ref held here would no longer contain it.
 
   return (
-    <div className="group/tile relative flex min-w-[100px] flex-1 items-center gap-1 px-2 py-1.5">
+    <div
+      {...dropProps}
+      className={`group/tile relative flex min-w-[76px] flex-1 shrink items-center gap-1 px-2 py-1.5 transition-opacity ${
+        dragging ? "opacity-40" : ""
+      }`}
+    >
       {/* Icon — single click opens picker; guard against double-click toggling twice */}
       <button
+        ref={setIconAnchor}
         type="button"
         onClick={(e) => {
           if (!editable || e.detail > 1) return; // ignore 2nd click of a dblclick
@@ -209,7 +243,17 @@ function KpiTile({ tile, editable, onChange, onRemove }: KpiTileProps) {
         title={editable ? "Click to change icon" : undefined}
         className={editable ? "shrink-0 cursor-pointer rounded p-0.5 hover:bg-zinc-100 transition-colors" : "shrink-0 cursor-default"}
       >
-        <KpiIconGlyph kind={tile.icon} />
+        {tile.iconImage ? (
+          <IconImage
+            src={tile.iconImage}
+            className="h-5 w-5"
+            // A remote image can stop resolving later; drop back to the glyph
+            // rather than leaving a broken-image box in the tile.
+            onError={() => onChange({ iconImage: undefined })}
+          />
+        ) : (
+          <KpiIconGlyph kind={tile.icon} />
+        )}
       </button>
 
       {/* Value + label — double-click anywhere in the column to edit */}
@@ -232,25 +276,46 @@ function KpiTile({ tile, editable, onChange, onRemove }: KpiTileProps) {
         />
       </div>
 
-      {/* Delete button — top-left corner, shown on hover */}
+      {/* Hover controls, grouped inside the tile's own bounds.
+          They used to sit at -left-1 / -right-1, which put one tile's grip on
+          exactly the same pixels as the next tile's delete button, because
+          adjacent tiles share an edge. */}
       {editable && (
-        <button
-          type="button"
-          onClick={onRemove}
-          title="Remove tile"
-          aria-label="Remove KPI tile"
-          className="absolute -left-1 -top-1 z-20 hidden h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] leading-none text-white shadow group-hover/tile:flex"
-        >
-          ×
-        </button>
+        <span className="absolute right-0.5 top-0.5 z-20 hidden items-center gap-0.5 group-hover/tile:flex">
+          <span
+            {...gripProps}
+            title="Drag to reorder"
+            aria-label="Drag to reorder tile"
+            className={`${
+              (gripProps.className as string) ?? ""
+            } flex h-4 w-4 cursor-grab items-center justify-center rounded bg-white text-zinc-400 shadow ring-1 ring-zinc-200 hover:text-zinc-700 active:cursor-grabbing`}
+          >
+            <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="currentColor">
+              <circle cx="6" cy="4" r="1.2" /><circle cx="10" cy="4" r="1.2" />
+              <circle cx="6" cy="8" r="1.2" /><circle cx="10" cy="8" r="1.2" />
+              <circle cx="6" cy="12" r="1.2" /><circle cx="10" cy="12" r="1.2" />
+            </svg>
+          </span>
+
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Remove tile"
+            aria-label="Remove KPI tile"
+            className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] leading-none text-white shadow hover:bg-red-600"
+          >
+            ×
+          </button>
+        </span>
       )}
 
-      {/* Icon picker popover */}
+      {/* Icon picker popover — portaled so the tile row's horizontal scroll
+          cannot clip it. */}
       {pickerOpen && (
-        <div
-          ref={pickerRef}
-          style={{ width: 196 }}
-          className="absolute left-0 top-full z-[200] mt-1 rounded-md border border-zinc-200 bg-white p-2 shadow-xl"
+        <PickerPopover
+          anchor={iconAnchor}
+          width={196}
+          onClose={() => setPickerOpen(false)}
         >
           <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wide text-zinc-400">
             Choose icon
@@ -261,12 +326,12 @@ function KpiTile({ tile, editable, onChange, onRemove }: KpiTileProps) {
                 key={kind}
                 type="button"
                 onClick={() => {
-                  onChange({ icon: kind });
+                  onChange({ icon: kind, iconImage: undefined });
                   setPickerOpen(false);
                 }}
                 title={kind}
                 className={`flex items-center justify-center rounded p-1 ${
-                  kind === tile.icon
+                  kind === tile.icon && !tile.iconImage
                     ? "bg-blue-600 ring-2 ring-blue-400"
                     : "hover:bg-zinc-100"
                 }`}
@@ -275,7 +340,13 @@ function KpiTile({ tile, editable, onChange, onRemove }: KpiTileProps) {
               </button>
             ))}
           </div>
-        </div>
+
+          <IconImageControls
+            value={tile.iconImage}
+            onChange={(image) => onChange({ iconImage: image ?? undefined })}
+            onDone={() => setPickerOpen(false)}
+          />
+        </PickerPopover>
       )}
     </div>
   );
